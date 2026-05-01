@@ -157,22 +157,33 @@ export function updateTournament(id: string, fn: (t: Tournament) => Tournament) 
 export function playerStandings(t: Tournament) {
   const stats: Record<
     string,
-    { player: string; points: number; played: number; won: number; diff: number }
+    {
+      player: string;
+      points: number;
+      played: number;
+      won: number;
+      tied: number;
+      lost: number;
+      diff: number;
+    }
   > = {};
   for (const p of t.players) {
-    stats[p] = { player: p, points: 0, played: 0, won: 0, diff: 0 };
+    stats[p] = { player: p, points: 0, played: 0, won: 0, tied: 0, lost: 0, diff: 0 };
   }
   for (const r of t.rounds) {
     for (const m of r.matches) {
       if (m.scoreA == null || m.scoreB == null) continue;
       const aWin = m.scoreA > m.scoreB;
       const bWin = m.scoreB > m.scoreA;
+      const tie = m.scoreA === m.scoreB;
       for (const p of m.teamA) {
         if (!stats[p]) continue;
         stats[p].points += m.scoreA;
         stats[p].played += 1;
         stats[p].diff += m.scoreA - m.scoreB;
         if (aWin) stats[p].won += 1;
+        else if (tie) stats[p].tied += 1;
+        else stats[p].lost += 1;
       }
       for (const p of m.teamB) {
         if (!stats[p]) continue;
@@ -180,6 +191,8 @@ export function playerStandings(t: Tournament) {
         stats[p].played += 1;
         stats[p].diff += m.scoreB - m.scoreA;
         if (bWin) stats[p].won += 1;
+        else if (tie) stats[p].tied += 1;
+        else stats[p].lost += 1;
       }
     }
   }
