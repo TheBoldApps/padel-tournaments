@@ -1,0 +1,135 @@
+import { useSyncExternalStore } from "react";
+
+export type Format = "americano" | "mexicano";
+
+export type Match = {
+  court: number;
+  teamA: string[];
+  teamB: string[];
+  scoreA: number | null;
+  scoreB: number | null;
+};
+
+export type Round = {
+  number: number;
+  matches: Match[];
+  resting: string[];
+};
+
+export type Tournament = {
+  id: string;
+  name: string;
+  format: Format;
+  pointsPerMatch: number;
+  players: string[];
+  rounds: Round[];
+  createdAt: number;
+};
+
+type State = { tournaments: Tournament[] };
+
+let state: State = { tournaments: [] };
+const listeners = new Set<() => void>();
+
+const STORAGE_KEY = "padel-tournaments-v1";
+
+function load() {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch {}
+}
+load();
+
+function persist() {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+function setState(next: State) {
+  state = next;
+  persist();
+  listeners.forEach((l) => l());
+}
+
+const store = {
+  getSnapshot: () => state,
+  subscribe: (l: () => void) => {
+    listeners.add(l);
+    return () => listeners.delete(l);
+  },
+};
+
+export function useTournaments() {
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+}
+
+export function getTournament(id: string) {
+  return state.tournaments.find((t) => t.id === id);
+}
+
+export function createTournament(input: {
+  name: string;
+  format: Format;
+  pointsPerMatch: number;
+  players: string[];
+}): Tournament {
+  const t: Tournament = {
+    id: Math.random().toString(36).slice(2, 10),
+    name: input.name,
+    format: input.format,
+    pointsPerMatch: input.pointsPerMatch,
+    players: input.players,
+    rounds: [],
+    createdAt: Date.now(),
+  };
+  setState({ tournaments: [t, ...state.tournaments] });
+  return t;
+}
+
+export function deleteTournament(id: string) {
+  setState({ tournaments: state.tournaments.filter((t) => t.id !== id) });
+}
+
+export function updateTournament(id: string, fn: (t: Tournament) => Tournament) {
+  setState({
+    tournaments: state.tournaments.map((t) => (t.id === id ? fn(t) : t)),
+  });
+}
+
+export function playerStandings(t: Tournament) {
+  const stats: Record<
+    string,
+    { player: string; points: number; played: number; won: number; diff: number }
+  > = {};
+  for (const p of t.players) {
+    stats[p] = { player: p, points: 0, played: 0, won: 0, diff: 0 };
+  }
+  for (const r of t.rounds) {
+    for (const m of r.matches) {
+      if (m.scoreA == null || m.scoreB == null) continue;
+      const aWin = m.scoreA > m.scoreB;
+      const bWin = m.scoreB > m.scoreA;
+      for (const p of m.teamA) {
+        if (!stats[p]) continue;
+        stats[p].points += m.scoreA;
+        stats[p].played += 1;
+        stats[p].diff += m.scoreA - m.scoreB;
+        if (aWin) stats[p].won += 1;
+      }
+      for (const p of m.teamB) {
+        if (!stats[p]) continue;
+        stats[p].points += m.scoreB;
+        stats[p].played += 1;
+        stats[p].diff += m.scoreB - m.scoreA;
+        if (bWin) stats[p].won += 1;
+      }
+    }
+  }
+  return Object.values(stats).sort(
+    (a, b) => b.points - a.points || b.diff - a.diff || b.won - a.won
+  );
+}
