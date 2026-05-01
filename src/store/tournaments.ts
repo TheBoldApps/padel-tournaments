@@ -15,6 +15,7 @@ export type Round = {
   number: number;
   matches: Match[];
   resting: string[];
+  final?: boolean;
 };
 
 export type Tournament = {
@@ -26,6 +27,7 @@ export type Tournament = {
   rounds: Round[];
   createdAt: number;
   updatedAt: number;
+  finishedAt?: number;
 };
 
 type State = { tournaments: Tournament[] };
