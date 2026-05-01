@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useColorScheme,
   View,
   ViewStyle,
 } from "react-native";
@@ -30,22 +31,55 @@ export const formatColors = {
   mexicano: { tint: "#F97316", soft: "#FFEDD5", deep: "#C2410C", text: "#7C2D12" },
 } as const;
 
+const formatColorsDark = {
+  // In dark mode the deep brand colors lose all contrast against a dark
+  // surface, and the pastel `soft` tints look out-of-place. We swap to a
+  // tonal-fill background derived from the brand tint and use the bright
+  // tint itself as the foreground.
+  americano: {
+    tint: "#2DD4BF",
+    soft: "rgba(45,212,191,0.18)",
+    deep: "#5EEAD4",
+    text: "#5EEAD4",
+  },
+  mexicano: {
+    tint: "#FB923C",
+    soft: "rgba(251,146,60,0.18)",
+    deep: "#FDBA74",
+    text: "#FDBA74",
+  },
+} as const;
+
+export function useFormatColors(format: keyof typeof formatColors) {
+  const scheme = useColorScheme();
+  return (scheme === "dark" ? formatColorsDark : formatColors)[format];
+}
+
 export function AdaptiveGlass({
   children,
   style,
   isInteractive,
   tint = "systemMaterial",
   intensity = 80,
+  tintColor,
+  glassEffectStyle,
 }: {
   children?: React.ReactNode;
   style?: ViewStyle;
   isInteractive?: boolean;
   tint?: React.ComponentProps<typeof BlurView>["tint"];
   intensity?: number;
+  tintColor?: string;
+  glassEffectStyle?: React.ComponentProps<typeof GlassView>["glassEffectStyle"];
 }) {
   if (process.env.EXPO_OS === "ios" && isLiquidGlassAvailable()) {
     return (
-      <GlassView isInteractive={isInteractive} style={style}>
+      <GlassView
+        isInteractive={isInteractive}
+        tintColor={tintColor}
+        glassEffectStyle={glassEffectStyle}
+        style={style}
+      >
         {children}
       </GlassView>
     );
@@ -55,7 +89,11 @@ export function AdaptiveGlass({
       <BlurView
         tint={tint}
         intensity={intensity}
-        style={[{ overflow: "hidden" }, style]}
+        style={[
+          { overflow: "hidden" },
+          tintColor ? { backgroundColor: tintColor } : null,
+          style,
+        ]}
       >
         {children}
       </BlurView>
@@ -65,12 +103,82 @@ export function AdaptiveGlass({
   return (
     <View
       style={[
-        { backgroundColor: "rgba(255,255,255,0.06)", overflow: "hidden" },
+        {
+          backgroundColor: tintColor ?? "rgba(255,255,255,0.06)",
+          overflow: "hidden",
+        },
         style,
       ]}
     >
       {children}
     </View>
+  );
+}
+
+export function GlassButton({
+  title,
+  icon,
+  onPress,
+  prominent,
+  disabled,
+  style,
+}: {
+  title: string;
+  icon?: string;
+  onPress: () => void;
+  prominent?: boolean;
+  disabled?: boolean;
+  style?: ViewStyle;
+}) {
+  const useSymbol = process.env.EXPO_OS === "ios";
+  const fg = prominent
+    ? "#FFFFFF"
+    : (PlatformColor("label") as unknown as string);
+  return (
+    <AdaptiveGlass
+      isInteractive
+      tintColor={prominent ? colors.primary : undefined}
+      style={StyleSheet.flatten([
+        {
+          borderRadius: 999,
+          borderCurve: "continuous",
+          opacity: disabled ? 0.5 : 1,
+        },
+        style,
+      ])}
+    >
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          paddingVertical: 14,
+          paddingHorizontal: 22,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        {icon && useSymbol ? (
+          <Image
+            source={`sf:${icon}`}
+            tintColor={fg}
+            style={{ width: 18, height: 18 }}
+          />
+        ) : null}
+        <Text
+          style={{
+            color: fg,
+            fontSize: 16,
+            fontWeight: "700",
+            letterSpacing: 0.1,
+          }}
+        >
+          {title}
+        </Text>
+      </Pressable>
+    </AdaptiveGlass>
   );
 }
 

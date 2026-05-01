@@ -3,10 +3,14 @@ import { mergeTournaments } from "@/lib/sync-merge";
 import {
   applyRemoteDelete,
   applyRemoteUpsert,
+  clearPendingLocalDelete,
+  getAllTournaments,
   onTournamentChange,
   replaceAllTournaments,
+  takePendingLocalDeletes,
   type SortBy,
   type Tournament,
+  whenHydrated,
 } from "@/store/tournaments";
 
 type RemoteRow = {
@@ -25,13 +29,21 @@ type RemoteRow = {
     roundTimerSeconds?: number;
     winBonus?: number;
     drawBonus?: number;
+    // Client-set updatedAt, persisted in JSONB so it survives the server trigger
+    // that always rewrites top-level updated_at to now(). This keeps LWW merge
+    // comparisons consistent across devices using a single (client) clock.
+    clientUpdatedAt?: number;
   };
   created_at: string;
   updated_at: string;
 };
 
 const toRemote = (t: Tournament, ownerId: string) => {
-  const data: RemoteRow["data"] = { players: t.players, rounds: t.rounds };
+  const data: RemoteRow["data"] = {
+    players: t.players,
+    rounds: t.rounds,
+    clientUpdatedAt: t.updatedAt,
+  };
   if (t.finishedAt != null) data.finishedAt = t.finishedAt;
   if (t.sortBy) data.sortBy = t.sortBy;
   if (t.courtsCount != null) data.courtsCount = t.courtsCount;
@@ -59,7 +71,10 @@ const fromRemote = (r: RemoteRow): Tournament => ({
   players: r.data.players ?? [],
   rounds: r.data.rounds ?? [],
   createdAt: new Date(r.created_at).getTime(),
-  updatedAt: new Date(r.updated_at).getTime(),
+  // Prefer client-set updatedAt if present (avoids cross-clock drift via the
+  // server's now() trigger). Fall back to the row's updated_at for legacy rows.
+  updatedAt:
+    r.data.clientUpdatedAt ?? new Date(r.updated_at).getTime(),
   finishedAt: r.data.finishedAt,
   sortBy: r.data.sortBy,
   courtsCount: r.data.courtsCount,
@@ -69,6 +84,7 @@ const fromRemote = (r: RemoteRow): Tournament => ({
   drawBonus: r.data.drawBonus,
 });
 
+let starting = false;
 let started = false;
 let ownerId: string | null = null;
 let unsubscribeChange: (() => void) | null = null;
@@ -86,65 +102,131 @@ async function pullTombstones(): Promise<Set<string>> {
   return new Set((data as { id: string }[]).map((r) => r.id));
 }
 
-export async function startSync(localTournaments: Tournament[]) {
-  if (started) return;
-  started = true;
+export async function startSync(_localTournaments: Tournament[]) {
+  if (started || starting) return;
+  starting = true;
   const gen = ++generation;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (gen !== generation) {
-    started = false;
-    return;
-  }
-  if (!user) {
-    started = false;
-    return;
-  }
-  ownerId = user.id;
+  // Helper that only resets the starting flag if THIS invocation is still the
+  // current one. Otherwise a newer startSync has already taken over and we
+  // must not clobber its `starting`/`started` state.
+  const cancel = () => {
+    if (gen === generation) {
+      starting = false;
+      started = false;
+    }
+  };
 
-  // Pull
-  const { data, error } = await supabase
-    .from("tournaments")
-    .select("*")
-    .eq("owner_id", ownerId)
-    .order("updated_at", { ascending: false });
+  try {
+    // Wait for AsyncStorage hydration before reading local state, otherwise
+    // we race the hydration code in the store and either lose persisted rows
+    // or resurrect deleted ones.
+    await whenHydrated();
+    if (gen !== generation) return cancel();
 
-  if (gen !== generation) {
-    started = false;
-    return;
-  }
+    let user;
+    try {
+      const res = await supabase.auth.getUser();
+      user = res.data.user;
+    } catch (e) {
+      console.warn("[sync] getUser failed", (e as Error)?.message);
+      return cancel();
+    }
+    if (gen !== generation) return cancel();
+    if (!user) return cancel();
+    ownerId = user.id;
 
-  if (error) {
-    console.warn("[sync] initial pull failed", error.message);
-    started = false;
-    return;
-  }
+    // Pull
+    const { data, error } = await supabase
+      .from("tournaments")
+      .select("*")
+      .eq("owner_id", ownerId)
+      .order("updated_at", { ascending: false });
 
-  const remote = (data as RemoteRow[]).map(fromRemote);
+    if (gen !== generation) return cancel();
 
-  // Pull tombstones and apply deletions before merge
-  const tombstones = await pullTombstones();
-  if (gen !== generation) {
-    started = false;
-    return;
-  }
-  const localFiltered = localTournaments.filter((t) => !tombstones.has(t.id));
-  for (const id of tombstones) applyRemoteDelete(id);
-  const remoteFiltered = remote.filter((t) => !tombstones.has(t.id));
-  const merged = mergeTournaments({ local: localFiltered, remote: remoteFiltered });
-  replaceAllTournaments(merged.next);
+    if (error) {
+      console.warn("[sync] initial pull failed", error.message);
+      return cancel();
+    }
 
-  // Subscribe to future local changes BEFORE the initial push loop, so any
-  // mutations happening concurrently with our pushes still get propagated.
-  unsubscribeChange = onTournamentChange((c) => {
-    if (c.kind === "upsert") void pushUpsert(c.tournament);
-    else void pushDelete(c.id);
-  });
+    const remote = (data as RemoteRow[]).map(fromRemote);
 
-  // Push any local-newer rows
-  for (const t of merged.toUpsert) {
-    if (gen !== generation) return;
-    await pushUpsert(t);
+    // Pull tombstones and apply deletions before merge
+    const tombstones = await pullTombstones();
+    if (gen !== generation) return cancel();
+
+    // Subscribe BEFORE we read local state and replace it, so any mutations
+    // happening concurrently are observed and forwarded. We capture a snapshot
+    // of the events that arrive while we're merging, then replay them after
+    // replaceAllTournaments to avoid clobbering in-flight local edits.
+    const queued: { kind: "upsert" | "delete"; id: string; t?: Tournament }[] =
+      [];
+    let draining = false;
+    unsubscribeChange = onTournamentChange((c) => {
+      if (draining) {
+        if (c.kind === "upsert") void pushUpsert(c.tournament);
+        else void pushDelete(c.id);
+        return;
+      }
+      if (c.kind === "upsert")
+        queued.push({ kind: "upsert", id: c.tournament.id, t: c.tournament });
+      else queued.push({ kind: "delete", id: c.id });
+    });
+
+    // Read the current store snapshot AFTER subscribing to avoid the gap.
+    const localTournaments = getAllTournaments();
+    const localFiltered = localTournaments.filter((t) => !tombstones.has(t.id));
+    for (const id of tombstones) applyRemoteDelete(id);
+    const remoteFiltered = remote.filter((t) => !tombstones.has(t.id));
+    const merged = mergeTournaments({
+      local: localFiltered,
+      remote: remoteFiltered,
+    });
+    replaceAllTournaments(merged.next);
+
+    // Replay any local mutations that happened while we were merging on top of
+    // the merged state, then enable straight-through forwarding for new ones.
+    const queuedDeleteIds: string[] = [];
+    for (const ev of queued) {
+      if (ev.kind === "upsert" && ev.t) applyRemoteUpsert(ev.t);
+      else if (ev.kind === "delete") {
+        applyRemoteDelete(ev.id);
+        queuedDeleteIds.push(ev.id);
+      }
+    }
+    draining = true;
+
+    // Push deletions that happened while offline (persisted local tombstones)
+    // plus any deletes that arrived while we were merging.
+    const pendingDeletes = new Set([
+      ...takePendingLocalDeletes(),
+      ...queuedDeleteIds,
+    ]);
+    for (const id of pendingDeletes) {
+      if (gen !== generation) return cancel();
+      await pushDelete(id);
+    }
+
+    // Push any local-newer rows. Always push from current store state so
+    // late edits are not stomped by the snapshot version from `merged`.
+    const upsertIds = new Set(merged.toUpsert.map((t) => t.id));
+    // Also push anything queued during merge.
+    for (const ev of queued) {
+      if (ev.kind === "upsert") upsertIds.add(ev.id);
+    }
+    const current = new Map(getAllTournaments().map((t) => [t.id, t]));
+    for (const id of upsertIds) {
+      if (gen !== generation) return cancel();
+      const t = current.get(id);
+      if (t) await pushUpsert(t);
+    }
+
+    started = true;
+    starting = false;
+  } catch (e) {
+    console.warn("[sync] startSync failed", (e as Error)?.message);
+    cancel();
   }
 }
 
@@ -154,6 +236,7 @@ export async function stopSync() {
   unsubscribeChange = null;
   ownerId = null;
   started = false;
+  starting = false;
 }
 
 async function pushUpsert(t: Tournament) {
@@ -166,18 +249,30 @@ async function pushUpsert(t: Tournament) {
 
 async function pushDelete(id: string) {
   if (!ownerId) return;
-  // Delete the row (RLS enforces ownership) AND record a tombstone so other
-  // devices know not to resurrect it on next merge.
-  const [del, tomb] = await Promise.all([
-    supabase.from("tournaments").delete().eq("id", id),
-    supabase.from("tournament_deletions").upsert({ id, owner_id: ownerId }),
-  ]);
-  if (del.error) console.warn("[sync] delete failed", id, del.error.message);
-  if (tomb.error) console.warn("[sync] tombstone failed", id, tomb.error.message);
+  // Write the tombstone FIRST so any concurrent fetch from another device
+  // sees the deletion intent before the row disappears. Otherwise a refetch
+  // racing the delete would see "no row, no tombstone" and re-push the local
+  // copy, resurrecting it.
+  const tomb = await supabase
+    .from("tournament_deletions")
+    .upsert({ id, owner_id: ownerId });
+  if (tomb.error) {
+    console.warn("[sync] tombstone failed", id, tomb.error.message);
+    // Leave the pending-local-delete entry in place so we retry on next sync.
+    return;
+  }
+  const del = await supabase.from("tournaments").delete().eq("id", id);
+  if (del.error) {
+    console.warn("[sync] delete failed", id, del.error.message);
+    return;
+  }
+  // Successfully pushed: drop the pending entry so we don't replay it.
+  clearPendingLocalDelete(id);
 }
 
-export async function refetch(localTournaments: Tournament[]) {
+export async function refetch(_localTournaments: Tournament[]) {
   if (!ownerId) return;
+  await whenHydrated();
   const { data, error } = await supabase
     .from("tournaments")
     .select("*")
@@ -186,12 +281,20 @@ export async function refetch(localTournaments: Tournament[]) {
   const remote = (data as RemoteRow[]).map(fromRemote);
 
   const tombstones = await pullTombstones();
+  // Read fresh local state after the awaits above (caller-passed snapshot may
+  // be stale by now).
+  const localTournaments = getAllTournaments();
   const localFiltered = localTournaments.filter((t) => !tombstones.has(t.id));
   for (const id of tombstones) applyRemoteDelete(id);
   const remoteFiltered = remote.filter((t) => !tombstones.has(t.id));
   const merged = mergeTournaments({ local: localFiltered, remote: remoteFiltered });
   replaceAllTournaments(merged.next);
-  for (const t of merged.toUpsert) await pushUpsert(t);
+  // Push from current state (post-replace) to avoid pushing stale snapshots.
+  const current = new Map(getAllTournaments().map((t) => [t.id, t]));
+  for (const t of merged.toUpsert) {
+    const fresh = current.get(t.id) ?? t;
+    await pushUpsert(fresh);
+  }
 }
 
 export function applyRemote(row: RemoteRow) {

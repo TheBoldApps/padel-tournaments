@@ -1,4 +1,4 @@
-import { colors } from "@/components/ui";
+import { AdaptiveGlass, colors } from "@/components/ui";
 import {
   Alert,
   Modal,
@@ -81,65 +81,64 @@ export function ScorePickerSheet({
       onRequestClose={onClose}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
-          style={[
-            styles.sheet,
-            {
-              paddingBottom: Math.max(insets.bottom, 24),
-            },
-          ]}
-          onPress={() => {}}
+        <AdaptiveGlass
+          style={{
+            ...styles.sheet,
+            paddingBottom: Math.max(insets.bottom, 24),
+          }}
         >
-          <View style={styles.dragHandle} />
-          <Text style={styles.title}>{title}</Text>
+          <Pressable onPress={() => {}}>
+            <View style={styles.dragHandle} />
+            <Text style={styles.title}>{title}</Text>
 
-          <View style={styles.grid}>
-            {cells.map((n) => {
-              const selected = n === currentScore;
-              return (
-                <Pressable
-                  key={n}
-                  onPress={() => handlePick(n)}
-                  style={({ pressed }) => [
-                    styles.cell,
-                    selected && { backgroundColor: colors.primary },
-                    pressed && { transform: [{ scale: 0.96 }] },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.cellText,
-                      {
-                        color: selected
-                          ? "#FFFFFF"
-                          : (PlatformColor("label") as unknown as string),
-                      },
+            <View style={styles.grid}>
+              {cells.map((n) => {
+                const selected = n === currentScore;
+                return (
+                  <Pressable
+                    key={n}
+                    onPress={() => handlePick(n)}
+                    style={({ pressed }) => [
+                      styles.cell,
+                      selected && { backgroundColor: colors.primary },
+                      pressed && { transform: [{ scale: 0.96 }] },
                     ]}
                   >
-                    {String(n).padStart(2, "0")}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                    <Text
+                      style={[
+                        styles.cellText,
+                        {
+                          color: selected
+                            ? "#FFFFFF"
+                            : (PlatformColor("label") as unknown as string),
+                        },
+                      ]}
+                    >
+                      {String(n).padStart(2, "0")}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-          <Pressable onPress={handleCustom} style={styles.customBtn}>
-            <Text style={styles.customText}>Enter Custom Score</Text>
-          </Pressable>
-          {showCustomHint ? (
-            <Text style={styles.customHint}>
-              Tap "Enter Custom Score" for higher values.
-            </Text>
-          ) : null}
+            <Pressable onPress={handleCustom} style={styles.customBtn}>
+              <Text style={styles.customText}>Enter Custom Score</Text>
+            </Pressable>
+            {showCustomHint ? (
+              <Text style={styles.customHint}>
+                Tap "Enter Custom Score" for higher values.
+              </Text>
+            ) : null}
 
-          <Pressable
-            onPress={resetDisabled ? undefined : handleReset}
-            disabled={resetDisabled}
-            style={[styles.resetBtn, { opacity: resetDisabled ? 0.4 : 1 }]}
-          >
-            <Text style={styles.resetText}>Reset</Text>
+            <Pressable
+              onPress={resetDisabled ? undefined : handleReset}
+              disabled={resetDisabled}
+              style={[styles.resetBtn, { opacity: resetDisabled ? 0.4 : 1 }]}
+            >
+              <Text style={styles.resetText}>Reset</Text>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </AdaptiveGlass>
       </Pressable>
     </Modal>
   );
@@ -152,7 +151,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: PlatformColor("systemBackground") as unknown as string,
+    backgroundColor: undefined,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderCurve: "continuous",

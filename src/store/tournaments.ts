@@ -50,11 +50,40 @@ let state: State = { tournaments: [] };
 let hydrated = false;
 const listeners = new Set<() => void>();
 const tombstones = new Set<string>();
+// IDs the user deleted while offline. Persisted so they survive app restarts
+// until the sync layer can flush them as tombstones to the server.
+const pendingLocalDeletes = new Set<string>();
 
 const STORAGE_KEY = "padel-tournaments-v1";
+const PENDING_DELETES_KEY = "padel-tournaments-pending-deletes-v1";
 
-AsyncStorage.getItem(STORAGE_KEY)
-  .then((raw) => {
+const hydrationWaiters: (() => void)[] = [];
+function markHydrated() {
+  hydrated = true;
+  for (const w of hydrationWaiters.splice(0)) w();
+}
+
+export function whenHydrated(): Promise<void> {
+  if (hydrated) return Promise.resolve();
+  return new Promise((resolve) => {
+    hydrationWaiters.push(resolve);
+  });
+}
+
+Promise.all([
+  AsyncStorage.getItem(STORAGE_KEY),
+  AsyncStorage.getItem(PENDING_DELETES_KEY),
+])
+  .then(([raw, pendingRaw]) => {
+    if (pendingRaw) {
+      try {
+        const ids: string[] = JSON.parse(pendingRaw);
+        for (const id of ids) {
+          pendingLocalDeletes.add(id);
+          tombstones.add(id);
+        }
+      } catch {}
+    }
     if (raw) {
       try {
         const persisted: State = JSON.parse(raw);
@@ -64,6 +93,9 @@ AsyncStorage.getItem(STORAGE_KEY)
             ...t,
             updatedAt: (t as any).updatedAt ?? t.createdAt,
           }));
+        // Merge with any in-memory mutations that happened pre-hydration.
+        // For overlapping ids, prefer the in-memory version (it's newer) but
+        // still pick up persisted-only rows that haven't been touched yet.
         const seen = new Set(state.tournaments.map((t) => t.id));
         const merged = [
           ...state.tournaments,
@@ -72,13 +104,37 @@ AsyncStorage.getItem(STORAGE_KEY)
         state = { tournaments: merged };
       } catch {}
     }
-    hydrated = true;
+    markHydrated();
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
     listeners.forEach((l) => l());
   })
   .catch(() => {
-    hydrated = true;
+    markHydrated();
+    listeners.forEach((l) => l());
   });
+
+function persistPendingDeletes() {
+  if (!hydrated) return;
+  AsyncStorage.setItem(
+    PENDING_DELETES_KEY,
+    JSON.stringify([...pendingLocalDeletes])
+  ).catch(() => {});
+}
+
+export function takePendingLocalDeletes(): string[] {
+  const ids = [...pendingLocalDeletes];
+  pendingLocalDeletes.clear();
+  persistPendingDeletes();
+  return ids;
+}
+
+export function clearPendingLocalDelete(id: string) {
+  if (pendingLocalDeletes.delete(id)) persistPendingDeletes();
+}
+
+export function getAllTournaments(): Tournament[] {
+  return state.tournaments;
+}
 
 export type Change =
   | { kind: "upsert"; tournament: Tournament }
@@ -157,6 +213,8 @@ export function createTournament(input: {
 
 export function deleteTournament(id: string) {
   tombstones.add(id);
+  pendingLocalDeletes.add(id);
+  persistPendingDeletes();
   setState({ tournaments: state.tournaments.filter((t) => t.id !== id) });
   changeListeners.forEach((l) => l({ kind: "delete", id }));
 }
@@ -231,9 +289,14 @@ export function playerStandings(t: Tournament) {
   }
 
   for (const r of t.rounds) {
-    // Sit-out compensation: award `sitOut` points to every resting player
-    // for every round (counts even if no matches were scored).
-    if (sitOut > 0) {
+    // Sit-out compensation: award `sitOut` points to every resting player,
+    // but only once the round has actually started (≥1 match scored). Without
+    // this gate, pre-generated rounds with all-null scores would inflate the
+    // leaderboard before play.
+    const roundStarted = r.matches.some(
+      (m) => m.scoreA != null && m.scoreB != null
+    );
+    if (sitOut > 0 && roundStarted) {
       for (const p of r.resting) {
         if (stats[p]) stats[p].points += sitOut;
       }

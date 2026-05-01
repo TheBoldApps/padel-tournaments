@@ -137,6 +137,40 @@ describe("playerStandings — settings", () => {
     expect(s.REST.played).toBe(0);
   });
 
+  test("sitOutPoints NOT awarded for unscored pre-generated rounds", () => {
+    // With Americano pre-generation, all rounds exist from creation but are
+    // unscored. The leaderboard must not credit sit-out points until a round
+    // is actually played.
+    const t: Tournament = {
+      id: "t",
+      name: "T",
+      format: "americano",
+      pointsPerMatch: 16,
+      players: ["A", "B", "C", "D", "REST"],
+      rounds: [
+        {
+          number: 1,
+          matches: [
+            { court: 1, teamA: ["A", "B"], teamB: ["C", "D"], scoreA: null, scoreB: null },
+          ],
+          resting: ["REST"],
+        },
+        {
+          number: 2,
+          matches: [
+            { court: 1, teamA: ["A", "C"], teamB: ["B", "D"], scoreA: null, scoreB: null },
+          ],
+          resting: ["REST"],
+        },
+      ],
+      createdAt: 0,
+      updatedAt: 0,
+      sitOutPoints: 8,
+    };
+    const s = Object.fromEntries(playerStandings(t).map((x) => [x.player, x]));
+    expect(s.REST.points).toBe(0);
+  });
+
   test("sortBy=wins ranks by win count first", () => {
     // 4 players, 2 matches: A+B beat C+D 16-0, A+B beat C+D 9-7.
     const t: Tournament = {

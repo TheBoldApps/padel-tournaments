@@ -202,7 +202,12 @@ function BigButton({
             : (PlatformColor(
                 "secondarySystemBackground"
               ) as unknown as string),
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+          boxShadow:
+            isPrimary && !disabled
+              ? "0 6px 16px rgba(20, 184, 166, 0.32)"
+              : "none",
+          opacity: disabled ? 0.4 : pressed ? 0.92 : 1,
+          transform: [{ scale: !disabled && pressed ? 0.98 : 1 }],
         },
       ]}
     >
@@ -212,7 +217,8 @@ function BigButton({
             ? "#FFFFFF"
             : (PlatformColor("label") as unknown as string),
           fontSize: 17,
-          fontWeight: "700",
+          fontWeight: "600",
+          letterSpacing: -0.2,
         }}
       >
         {title}
@@ -294,6 +300,9 @@ export function SoftHeader({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  // Reserve equal horizontal space on both sides for the absolutely-centered
+  // title so it stays optically centered regardless of which pills are shown.
+  const SIDE_RESERVE = 96;
   return (
     <View
       style={{
@@ -307,17 +316,22 @@ export function SoftHeader({
     >
       <View
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
+          minHeight: 44,
+          justifyContent: "center",
         }}
       >
-        {canBack ? (
-          <PillButton icon="chevron.left" label="Back" onPress={onBack} />
-        ) : (
-          <View style={{ width: 84 }} />
-        )}
-        <View style={{ flex: 1, alignItems: "center" }}>
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: SIDE_RESERVE,
+            right: SIDE_RESERVE,
+            top: 0,
+            bottom: 0,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <Text
             numberOfLines={1}
             style={{
@@ -341,7 +355,20 @@ export function SoftHeader({
             </Text>
           ) : null}
         </View>
-        <PillButton icon="xmark" onPress={onClose} />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          {canBack ? (
+            <PillButton icon="chevron.left" label="Back" onPress={onBack} />
+          ) : (
+            <View style={{ width: 44, height: 44 }} />
+          )}
+          <PillButton icon="xmark" onPress={onClose} />
+        </View>
       </View>
     </View>
   );
@@ -440,7 +467,7 @@ export function CancelButton() {
 
 const chrome = StyleSheet.create({
   bigBtn: {
-    height: 52,
+    height: 54,
     borderRadius: 16,
     borderCurve: "continuous",
     alignItems: "center",

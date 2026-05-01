@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { generateAmericanoRound, generateMexicanoRound } from "./scheduler";
+import {
+  generateAmericanoRound,
+  generateMexicanoRound,
+  regenerateUnscoredRounds,
+} from "./scheduler";
 import type { Tournament } from "@/store/tournaments";
 
 const baseTournament = (
@@ -97,6 +101,144 @@ describe("generateMexicanoRound — avoid immediate repeat partnerships", () => 
     const r1 = partners(t.rounds[0].matches[0]);
     const r2 = partners(r.matches[0]);
     expect(r2).not.toEqual(r1);
+  });
+});
+
+describe("generateAmericanoRound — iterative pre-generation", () => {
+  test("4 players, 3 rounds produces every unique partnership exactly once", () => {
+    const players = ["A", "B", "C", "D"];
+    let t: Tournament = {
+      id: "t",
+      name: "T",
+      format: "americano",
+      pointsPerMatch: 16,
+      players,
+      rounds: [],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    for (let i = 0; i < 3; i++) {
+      const r = generateAmericanoRound(t);
+      t = { ...t, rounds: [...t.rounds, r] };
+    }
+    const pairs = new Set<string>();
+    for (const r of t.rounds) {
+      for (const m of r.matches) {
+        pairs.add([...m.teamA].sort().join("|"));
+        pairs.add([...m.teamB].sort().join("|"));
+      }
+    }
+    // C(4,2) = 6 unique pairs; each round contributes 2 fresh ones.
+    expect(pairs.size).toBe(6);
+  });
+});
+
+describe("regenerateUnscoredRounds — mid-tournament roster shrink", () => {
+  test("7→5 players mid-tournament: scored rounds untouched, unscored regenerated with new roster only", () => {
+    // Simulate the user's scenario: 7 players, Americano with 6 pre-generated
+    // rounds. Round 1 is fully scored. Two players ("F", "G") drop out at the
+    // start of round 2, admin removes them, schedule should be rebuilt for
+    // the remaining 5 players from round 2 onward.
+    let t: Tournament = {
+      id: "t",
+      name: "T",
+      format: "americano",
+      pointsPerMatch: 16,
+      players: ["A", "B", "C", "D", "E", "F", "G"],
+      rounds: [],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    // Pre-generate 6 rounds.
+    for (let i = 0; i < 6; i++) {
+      t = { ...t, rounds: [...t.rounds, generateAmericanoRound(t)] };
+    }
+    // Score round 1 fully.
+    const r1 = t.rounds[0];
+    t = {
+      ...t,
+      rounds: [
+        {
+          ...r1,
+          matches: r1.matches.map((m) => ({ ...m, scoreA: 10, scoreB: 6 })),
+        },
+        ...t.rounds.slice(1),
+      ],
+    };
+    const round1Snapshot = JSON.stringify(t.rounds[0]);
+
+    // Roster shrink: drop F and G.
+    const remaining = t.players.filter((p) => p !== "F" && p !== "G");
+    const reduced: Tournament = { ...t, players: remaining };
+    const newRounds = regenerateUnscoredRounds(reduced);
+
+    // Round 1 (fully scored) untouched.
+    expect(JSON.stringify(newRounds[0])).toBe(round1Snapshot);
+    // Total round count preserved.
+    expect(newRounds.length).toBe(6);
+    // Rounds 2..6 must contain ONLY remaining players.
+    for (let i = 1; i < newRounds.length; i++) {
+      const r = newRounds[i];
+      const seen = new Set<string>();
+      for (const m of r.matches) for (const p of [...m.teamA, ...m.teamB]) seen.add(p);
+      for (const p of r.resting) seen.add(p);
+      expect([...seen].sort()).toEqual([...remaining].sort());
+      // 5 players, 1 court → 4 play, 1 rests.
+      expect(r.matches.length).toBe(1);
+      expect(r.resting.length).toBe(1);
+    }
+  });
+
+  test("all rounds unscored: every round regenerated", () => {
+    let t: Tournament = {
+      id: "t",
+      name: "T",
+      format: "americano",
+      pointsPerMatch: 16,
+      players: ["A", "B", "C", "D", "E", "F"],
+      rounds: [],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    for (let i = 0; i < 5; i++) {
+      t = { ...t, rounds: [...t.rounds, generateAmericanoRound(t)] };
+    }
+    const reduced: Tournament = {
+      ...t,
+      players: ["A", "B", "C", "D"],
+    };
+    const out = regenerateUnscoredRounds(reduced);
+    expect(out.length).toBe(5);
+    for (const r of out) {
+      const seen = new Set<string>();
+      for (const m of r.matches) for (const p of [...m.teamA, ...m.teamB]) seen.add(p);
+      for (const p of r.resting) seen.add(p);
+      expect([...seen].sort()).toEqual(["A", "B", "C", "D"]);
+    }
+  });
+
+  test("all rounds fully scored: nothing changes", () => {
+    const t: Tournament = {
+      id: "t",
+      name: "T",
+      format: "americano",
+      pointsPerMatch: 16,
+      players: ["A", "B", "C", "D"],
+      rounds: [
+        {
+          number: 1,
+          matches: [
+            { court: 1, teamA: ["A", "B"], teamB: ["C", "D"], scoreA: 10, scoreB: 6 },
+          ],
+          resting: [],
+        },
+      ],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const before = JSON.stringify(t.rounds);
+    const out = regenerateUnscoredRounds(t);
+    expect(JSON.stringify(out)).toBe(before);
   });
 });
 

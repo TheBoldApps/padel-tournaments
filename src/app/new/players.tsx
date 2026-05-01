@@ -137,7 +137,7 @@ export default function StepPlayers() {
       ) : (
         <AdaptiveGlass style={styles.listCard}>
           {players.map((p, i) => (
-            <View key={p}>
+            <View key={`${i}:${p}`}>
               <View style={styles.selectedRow}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{p.charAt(0).toUpperCase()}</Text>

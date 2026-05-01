@@ -1,4 +1,4 @@
-import { AdaptiveGlass, Button, formatColors } from "@/components/ui";
+import { AdaptiveGlass, GlassButton, useFormatColors } from "@/components/ui";
 import { MatchCard } from "@/components/match-card";
 import { MenuSheet, type MenuItem } from "@/components/menu-sheet";
 import { RoundPillSelector } from "@/components/round-pill-selector";
@@ -31,6 +31,7 @@ export default function TournamentScreen() {
   } | null>(null);
 
   const t = tournaments.find((x) => x.id === id);
+  const fc = useFormatColors(t?.format ?? "americano");
   const lastKnownRoundCount = useRef(t?.rounds.length ?? 0);
 
   // Auto-jump to the new latest round only if a round was added AND the user
@@ -68,7 +69,6 @@ export default function TournamentScreen() {
   }
 
   const finished = t.finishedAt != null;
-  const fc = formatColors[t.format];
 
   const addRound = () => {
     const round = generateNextRound(t);
@@ -92,12 +92,18 @@ export default function TournamentScreen() {
         const matches = r.matches.map((m, mi) => {
           if (mi !== matchIdx) return m;
           const next: Match = { ...m };
-          if (side === "A") {
+          if (num == null) {
+            // Clearing one side clears the auto-completed counterpart too,
+            // otherwise we'd leave a half-scored match (which the standings
+            // skip entirely, surprising the user).
+            next.scoreA = null;
+            next.scoreB = null;
+          } else if (side === "A") {
             next.scoreA = num;
-            if (num != null) next.scoreB = cur.pointsPerMatch - num;
+            next.scoreB = cur.pointsPerMatch - num;
           } else {
             next.scoreB = num;
-            if (num != null) next.scoreA = cur.pointsPerMatch - num;
+            next.scoreA = cur.pointsPerMatch - num;
           }
           return next;
         });
@@ -296,16 +302,18 @@ export default function TournamentScreen() {
       )}
 
       <View style={styles.bottomBar}>
-        <Button
-          title="+ More"
-          variant="ghost"
+        <GlassButton
+          title="More"
+          icon="plus"
           onPress={addRound}
           disabled={finished}
           style={{ flex: 1 }}
         />
-        <Button
+        <GlassButton
           title={finished ? "Leaderboard" : "Finish"}
+          icon={finished ? "list.number" : "checkmark"}
           onPress={finishOrLeaderboard}
+          prominent
           style={{ flex: 1.4 }}
         />
       </View>

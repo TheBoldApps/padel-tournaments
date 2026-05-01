@@ -55,11 +55,8 @@ export function SettingsRow({
   destructive?: boolean;
   last?: boolean;
 }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
-    >
+  const inner = (
+    <>
       <View style={styles.row}>
         {icon ? (
           process.env.EXPO_OS === "ios" ? (
@@ -106,6 +103,19 @@ export function SettingsRow({
           }}
         />
       )}
+    </>
+  );
+
+  if (!onPress) {
+    return <View>{inner}</View>;
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
+    >
+      {inner}
     </Pressable>
   );
 }

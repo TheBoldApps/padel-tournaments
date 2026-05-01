@@ -43,11 +43,11 @@ export default function RoundBreakdown() {
             ))}
             <Text style={[styles.cell, styles.headerCell]}>Total</Text>
           </View>
-          {t.players.map((p) => {
+          {t.players.map((p, pi) => {
             const perRound = t.rounds.map((r) => pointsForPlayerInRound(p, r));
             const total = perRound.reduce((a, b) => a + b, 0);
             return (
-              <View key={p} style={styles.row}>
+              <View key={`${pi}:${p}`} style={styles.row}>
                 <Text style={[styles.cell, styles.player]} numberOfLines={1}>
                   {p}
                 </Text>

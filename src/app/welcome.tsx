@@ -2,7 +2,7 @@ import { Button } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,10 +15,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Welcome() {
   const [loading, setLoading] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const continueAnonymously = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signInAnonymously();
+    if (!mounted.current) return;
     setLoading(false);
     if (error) {
       Alert.alert(

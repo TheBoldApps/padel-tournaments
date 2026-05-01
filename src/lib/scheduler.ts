@@ -4,6 +4,17 @@ function pairKey(a: string, b: string) {
   return [a, b].sort().join("|");
 }
 
+// Fisher-Yates shuffle. Use this instead of `Array.sort(() => Math.random() - 0.5)`,
+// which is a non-transitive comparator (biased + can throw in some V8 versions).
+function shuffle<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export function generateAmericanoRound(t: Tournament): Round {
   const courts = Math.max(
     1,
@@ -36,9 +47,14 @@ export function generateAmericanoRound(t: Tournament): Round {
   for (const r of t.rounds) for (const p of r.resting) restCounts[p] = (restCounts[p] ?? 0) + 1;
 
   const needed = courts * 4;
-  const sortedByRest = [...t.players].sort(
-    (a, b) => restCounts[b] - restCounts[a] || Math.random() - 0.5
-  );
+  // Shuffle first, then stable-sort by rest count desc — gives a deterministic,
+  // unbiased random tiebreak (Math.random() - 0.5 in a comparator is not a
+  // valid total order).
+  const shuffledPlayers = shuffle(t.players);
+  const sortedByRest = shuffledPlayers
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => restCounts[b.p] - restCounts[a.p] || a.i - b.i)
+    .map((x) => x.p);
   const playing = sortedByRest.slice(0, needed);
   const resting = sortedByRest.slice(needed);
 
@@ -62,7 +78,7 @@ function bestMatching(
   let best: { teamA: string[]; teamB: string[] }[] | null = null;
   let bestScore = Infinity;
   for (let attempt = 0; attempt < 200; attempt++) {
-    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    const shuffled = shuffle(players);
     const matches: { teamA: string[]; teamB: string[] }[] = [];
     let score = 0;
     for (let i = 0; i < shuffled.length; i += 4) {
@@ -198,6 +214,38 @@ export function generateMexicanoRound(t: Tournament): Round {
 
 export function generateNextRound(t: Tournament): Round {
   return t.format === "mexicano" ? generateMexicanoRound(t) : generateAmericanoRound(t);
+}
+
+/**
+ * Rebuild a tournament's round schedule after the roster (or anything else
+ * that affects future pairings) changes. Strategy: keep every fully-scored
+ * round at the start of the schedule as-is, drop the first unscored round and
+ * everything after it, then regenerate enough rounds to restore the original
+ * length using the format's normal scheduler. Partial scores in the cut-off
+ * range are intentionally discarded — pairings would otherwise mix old
+ * (now-removed) players with new ones.
+ */
+export function regenerateUnscoredRounds(t: Tournament): Round[] {
+  const firstUnscoredIdx = t.rounds.findIndex((r) =>
+    r.matches.length === 0
+      ? false
+      : r.matches.some((m) => m.scoreA == null || m.scoreB == null)
+  );
+  const keptCount =
+    firstUnscoredIdx === -1 ? t.rounds.length : firstUnscoredIdx;
+  const target = t.rounds.length;
+  // If the schedule originally ended with a final round, preserve that intent
+  // when regenerating so we don't silently demote it to a regular round.
+  const lastWasFinal = target > 0 && t.rounds[target - 1].final === true;
+  const out: Round[] = t.rounds.slice(0, keptCount);
+  while (out.length < target) {
+    if (lastWasFinal && out.length === target - 1) {
+      out.push(generateFinalRound({ ...t, rounds: out }));
+    } else {
+      out.push(generateNextRound({ ...t, rounds: out }));
+    }
+  }
+  return out;
 }
 
 export function generateFinalRound(t: Tournament): Round {

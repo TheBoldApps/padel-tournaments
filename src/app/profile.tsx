@@ -4,7 +4,7 @@ import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   PlatformColor,
@@ -20,12 +20,20 @@ export default function Profile() {
     (user?.user_metadata?.display_name as string) ?? ""
   );
   const [saving, setSaving] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const saveName = async () => {
     setSaving(true);
     const { error } = await supabase.auth.updateUser({
       data: { display_name: name },
     });
+    if (!mounted.current) return;
     setSaving(false);
     if (error) {
       Alert.alert("Couldn't save", error.message);
@@ -55,9 +63,11 @@ export default function Profile() {
         token: credential.identityToken,
       });
       if (error) throw error;
+      if (!mounted.current) return;
       if (router.canGoBack()) router.back();
     } catch (e: any) {
       if (e.code === "ERR_REQUEST_CANCELED") return;
+      if (!mounted.current) return;
       Alert.alert("Couldn't link Apple", String(e?.message ?? e));
     }
   };

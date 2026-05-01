@@ -34,6 +34,11 @@ function SyncDriver() {
     });
     return () => {
       sub.remove();
+      // Tear down sync on every change of identity so a fresh startSync sees
+      // a clean slate. Without this, switching users (e.g., anon → linked
+      // Apple identity that creates a new user) would early-return because
+      // `started`/`starting` from the previous identity is still set.
+      void stopSync();
     };
   }, [session?.user.id]);
 

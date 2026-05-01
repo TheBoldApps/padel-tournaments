@@ -2,7 +2,7 @@ import { Button } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -25,6 +25,13 @@ export default function SignIn() {
   // True when the verify step should bind the new email to the current
   // (anonymous) user instead of starting a fresh session.
   const [isUpgrade, setIsUpgrade] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const sendCode = async () => {
     setLoading(true);
@@ -36,6 +43,7 @@ export default function SignIn() {
           email,
           options: { shouldCreateUser: true },
         });
+    if (!mounted.current) return;
     setLoading(false);
     if (error) {
       Alert.alert("Couldn't send code", error.message);
@@ -58,6 +66,7 @@ export default function SignIn() {
       token: code,
       type: reallyUpgrade ? "email_change" : "email",
     });
+    if (!mounted.current) return;
     setLoading(false);
     if (error) {
       Alert.alert("Invalid code", error.message);

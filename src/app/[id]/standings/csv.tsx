@@ -11,6 +11,14 @@ export default function CsvExport() {
   const { tournaments } = useTournaments();
   const t = tournaments.find((x) => x.id === id);
   const ran = useRef(false);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!t || ran.current) return;
@@ -27,6 +35,7 @@ export default function CsvExport() {
       } else {
         Alert.alert("Sharing not available on this device.");
       }
+      if (!mounted.current) return;
       if (router.canGoBack()) router.back();
     })();
   }, [t?.id]);

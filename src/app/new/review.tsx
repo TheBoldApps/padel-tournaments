@@ -130,9 +130,24 @@ export default function StepReview() {
       winBonus,
       drawBonus,
     };
-    updateTournament(t.id, (cur) => ({ ...cur, ...settings }));
-    const firstRound = generateNextRound({ ...t, ...settings });
-    updateTournament(t.id, (cur) => ({ ...cur, rounds: [firstRound] }));
+    // Americano is purely combinatorial — pre-generate the full schedule so
+    // every round is visible immediately. Mexicano draws the next round from
+    // running scores, so we can only seed round 1.
+    const targetRounds =
+      format === "americano"
+        ? roundsCount ?? Math.max(1, players.length - 1)
+        : 1;
+    const initialRounds: ReturnType<typeof generateNextRound>[] = [];
+    while (initialRounds.length < targetRounds) {
+      initialRounds.push(
+        generateNextRound({ ...t, ...settings, rounds: initialRounds })
+      );
+    }
+    updateTournament(t.id, (cur) => ({
+      ...cur,
+      ...settings,
+      rounds: initialRounds,
+    }));
     router.dismissTo(`/${t.id}`);
   };
 

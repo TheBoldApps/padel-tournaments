@@ -1,3 +1,4 @@
+import { colors } from "@/components/ui";
 import {
   PlatformColor,
   Pressable,
@@ -20,14 +21,16 @@ export function ScoreBox({
 }) {
   const bg =
     state === "winner"
-      ? "#3B6BFF"
+      ? colors.primary
       : state === "loser"
-      ? "#9AA0A6"
+      ? (PlatformColor("tertiarySystemFill") as unknown as string)
       : (PlatformColor("secondarySystemBackground") as unknown as string);
   const fg =
-    state === "neutral"
-      ? (PlatformColor("label") as unknown as string)
-      : "#FFFFFF";
+    state === "winner"
+      ? "#FFFFFF"
+      : state === "loser"
+      ? (PlatformColor("secondaryLabel") as unknown as string)
+      : (PlatformColor("label") as unknown as string);
 
   const display = value == null ? "––" : String(value).padStart(2, "0");
 

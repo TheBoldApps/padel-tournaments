@@ -1,17 +1,54 @@
 import { SettingsRow, SettingsSection } from "@/components/settings-row";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { setThemeMode, useThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import * as Application from "expo-application";
 import { router } from "expo-router";
 import * as StoreReview from "expo-store-review";
-import { Alert, Linking, ScrollView } from "react-native";
+import { ActionSheetIOS, Alert, Linking, ScrollView } from "react-native";
 
 const TERMS_URL = "https://example.com/padel-tournaments/terms";
 const PRIVACY_URL = "https://example.com/padel-tournaments/privacy";
 const FEEDBACK_EMAIL = "hello@jiridiblik.com";
 
+const THEME_LABELS: Record<ThemeMode, string> = {
+  light: "Light",
+  dark: "Dark",
+  auto: "Automatic",
+};
+
 export default function Settings() {
   const { user, isAnonymous } = useSession();
+  const themeMode = useThemeMode();
+
+  const pickTheme = () => {
+    const options: { label: string; value: ThemeMode }[] = [
+      { label: "Automatic", value: "auto" },
+      { label: "Light", value: "light" },
+      { label: "Dark", value: "dark" },
+    ];
+    if (process.env.EXPO_OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: "Appearance",
+          options: [...options.map((o) => o.label), "Cancel"],
+          cancelButtonIndex: options.length,
+        },
+        (idx) => {
+          if (idx == null || idx === options.length) return;
+          setThemeMode(options[idx].value);
+        }
+      );
+    } else {
+      Alert.alert("Appearance", undefined, [
+        ...options.map((o) => ({
+          text: o.label,
+          onPress: () => setThemeMode(o.value),
+        })),
+        { text: "Cancel", style: "cancel" as const },
+      ]);
+    }
+  };
 
   const onSignOut = () => {
     Alert.alert("Sign out?", "You'll need to sign back in to sync changes.", [
@@ -42,6 +79,19 @@ export default function Settings() {
       contentContainerStyle={{ paddingBottom: 40 }}
       style={{ flex: 1 }}
     >
+      <SettingsSection
+        title="Appearance"
+        footer="Automatic follows your iOS Light/Dark setting."
+      >
+        <SettingsRow
+          icon="circle.lefthalf.filled"
+          label="Theme"
+          value={THEME_LABELS[themeMode]}
+          onPress={pickTheme}
+          last
+        />
+      </SettingsSection>
+
       <SettingsSection title="Account">
         <SettingsRow
           icon="person.crop.circle"

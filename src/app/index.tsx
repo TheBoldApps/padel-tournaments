@@ -1,10 +1,14 @@
-import { AdaptiveGlass, GlassFab, colors, formatColors } from "@/components/ui";
+import { MenuSheet, type MenuItem } from "@/components/menu-sheet";
+import { ShimmerFab } from "@/components/shimmer-fab";
+import { AdaptiveGlass, colors, useFormatColors } from "@/components/ui";
 import { refetch } from "@/lib/sync";
 import {
   deleteTournament,
+  updateTournament,
   useTournaments,
   type Tournament,
 } from "@/store/tournaments";
+import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Stack, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -18,6 +22,64 @@ import {
   Text,
   View,
 } from "react-native";
+
+function TournamentRow({
+  tournament,
+  onOpen,
+  onLongPress,
+}: {
+  tournament: Tournament;
+  onOpen: () => void;
+  onLongPress: (pageY: number) => void;
+}) {
+  const fc = useFormatColors(tournament.format);
+  const totalMatches = tournament.rounds.reduce(
+    (s, r) => s + r.matches.length,
+    0
+  );
+  return (
+    <Pressable
+      onPress={onOpen}
+      onLongPress={(e) => onLongPress(e.nativeEvent.pageY)}
+      delayLongPress={300}
+    >
+      <AdaptiveGlass style={styles.card}>
+        <View style={[styles.accentStripe, { backgroundColor: fc.tint }]} />
+        <View style={styles.topRow}>
+          <View style={[styles.formatPill, { backgroundColor: fc.soft }]}>
+            <Text style={[styles.formatPillText, { color: fc.deep }]}>
+              {tournament.format === "americano" ? "Americano" : "Mexicano"}
+            </Text>
+          </View>
+          <Text style={styles.date}>
+            {DATE_FORMAT.format(new Date(tournament.createdAt))}
+          </Text>
+        </View>
+        <Text style={styles.name}>{tournament.name}</Text>
+        <View style={styles.divider} />
+        <Text style={styles.meta}>
+          <Text style={{ color: fc.deep, fontWeight: "700" }}>
+            {tournament.players.length}
+          </Text>{" "}
+          Players ·{" "}
+          <Text style={{ color: fc.deep, fontWeight: "700" }}>
+            {tournament.rounds.length}
+          </Text>{" "}
+          Rounds
+          {totalMatches ? (
+            <>
+              {" · "}
+              <Text style={{ color: fc.deep, fontWeight: "700" }}>
+                {totalMatches}
+              </Text>{" "}
+              Matches
+            </>
+          ) : null}
+        </Text>
+      </AdaptiveGlass>
+    </Pressable>
+  );
+}
 
 const MONTH_FORMAT = new Intl.DateTimeFormat(undefined, {
   month: "long",
@@ -45,6 +107,8 @@ export default function Home() {
   const { tournaments } = useTournaments();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [menuTournament, setMenuTournament] = useState<Tournament | null>(null);
+  const [menuAnchorY, setMenuAnchorY] = useState<number | undefined>();
   const sections = useMemo(() => groupByMonth(tournaments), [tournaments]);
 
   const onRefresh = async () => {
@@ -63,6 +127,59 @@ export default function Home() {
       },
     ]);
   };
+
+  const promptRename = (id: string, current: string) => {
+    if (process.env.EXPO_OS !== "ios") {
+      // Non-iOS: send to the edit screen since Alert.prompt is iOS-only.
+      router.push(`/${id}/edit`);
+      return;
+    }
+    Alert.prompt(
+      "Rename tournament",
+      undefined,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Save",
+          onPress: (text?: string) => {
+            const next = (text ?? "").trim();
+            if (!next) return;
+            updateTournament(id, (cur) => ({ ...cur, name: next }));
+          },
+        },
+      ],
+      "plain-text",
+      current
+    );
+  };
+
+  const openTournamentMenu = (t: Tournament, pageY?: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setMenuAnchorY(pageY);
+    setMenuTournament(t);
+  };
+
+  const menuItems: MenuItem[] = menuTournament
+    ? [
+        {
+          label: "Rename",
+          icon: "pencil",
+          onPress: () =>
+            promptRename(menuTournament.id, menuTournament.name),
+        },
+        {
+          label: "Edit Settings",
+          icon: "slider.horizontal.3",
+          onPress: () => router.push(`/${menuTournament.id}/edit`),
+        },
+        {
+          label: "Delete",
+          icon: "trash",
+          destructive: true,
+          onPress: () => confirmDelete(menuTournament.id, menuTournament.name),
+        },
+      ]
+    : [];
 
   const useSymbol = process.env.EXPO_OS === "ios";
 
@@ -114,62 +231,29 @@ export default function Home() {
             </Text>
           </View>
         }
-        renderItem={({ item }) => {
-          const totalMatches = item.rounds.reduce(
-            (s, r) => s + r.matches.length,
-            0
-          );
-          const fc = formatColors[item.format];
-          return (
-            <Pressable
-              onPress={() => router.push(`/${item.id}`)}
-              onLongPress={() => confirmDelete(item.id, item.name)}
-            >
-              <AdaptiveGlass style={styles.card}>
-                <View style={[styles.accentStripe, { backgroundColor: fc.tint }]} />
-                <View style={styles.topRow}>
-                  <View style={[styles.formatPill, { backgroundColor: fc.soft }]}>
-                    <Text style={[styles.formatPillText, { color: fc.deep }]}>
-                      {item.format === "americano" ? "Americano" : "Mexicano"}
-                    </Text>
-                  </View>
-                  <Text style={styles.date}>
-                    {DATE_FORMAT.format(new Date(item.createdAt))}
-                  </Text>
-                </View>
-                <Text style={styles.name}>{item.name}</Text>
-                <View style={styles.divider} />
-                <Text style={styles.meta}>
-                  <Text style={{ color: fc.deep, fontWeight: "700" }}>
-                    {item.players.length}
-                  </Text>{" "}
-                  Players ·{" "}
-                  <Text style={{ color: fc.deep, fontWeight: "700" }}>
-                    {item.rounds.length}
-                  </Text>{" "}
-                  Rounds
-                  {totalMatches ? (
-                    <>
-                      {" · "}
-                      <Text style={{ color: fc.deep, fontWeight: "700" }}>
-                        {totalMatches}
-                      </Text>{" "}
-                      Matches
-                    </>
-                  ) : null}
-                </Text>
-              </AdaptiveGlass>
-            </Pressable>
-          );
-        }}
+        renderItem={({ item }) => (
+          <TournamentRow
+            tournament={item}
+            onOpen={() => router.push(`/${item.id}`)}
+            onLongPress={(pageY) => openTournamentMenu(item, pageY)}
+          />
+        )}
       />
       <View style={styles.fab}>
-        <GlassFab
+        <ShimmerFab
           icon="plus"
           label="Create Tournament"
           onPress={() => router.push("/new")}
         />
       </View>
+      <MenuSheet
+        visible={menuTournament != null}
+        onClose={() => setMenuTournament(null)}
+        items={menuItems}
+        title={menuTournament?.name}
+        placement="anchored"
+        anchorY={menuAnchorY}
+      />
     </View>
   );
 }
