@@ -14,6 +14,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -199,6 +200,19 @@ export function confirmDiscardThen(action: () => void, isDirty: boolean) {
       { text: "Discard", style: "destructive", onPress: action },
     ],
     { cancelable: true }
+  );
+}
+
+export function CancelButton() {
+  const router = useRouter();
+  const { isDirty } = useWizard();
+  return (
+    <Pressable
+      onPress={() => confirmDiscardThen(() => router.dismiss(), isDirty())}
+      hitSlop={10}
+    >
+      <Text style={{ color: colors.primary, fontSize: 17 }}>Cancel</Text>
+    </Pressable>
   );
 }
 

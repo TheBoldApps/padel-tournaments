@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { PlatformColor } from "react-native";
-import { WizardProvider } from "./_chrome";
+import { CancelButton, WizardProvider } from "./_chrome";
 
 export default function NewWizardLayout() {
   return (
@@ -14,6 +14,7 @@ export default function NewWizardLayout() {
           headerTintColor: PlatformColor("systemTeal") as unknown as string,
           headerBackButtonDisplayMode: "minimal",
           contentStyle: { backgroundColor: "transparent" },
+          headerLeft: () => <CancelButton />,
         }}
       >
         <Stack.Screen name="index" options={{ title: "Step 1 of 4" }} />
