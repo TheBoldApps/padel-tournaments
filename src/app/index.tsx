@@ -6,7 +6,7 @@ import {
 } from "@/store/tournaments";
 import { useTheme } from "@react-navigation/native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import {
   Alert,
   FlatList,
@@ -37,6 +37,28 @@ export default function Home() {
 
   return (
     <View style={[styles.container, { backgroundColor: tc.background }]}>
+      <Stack.Screen
+        options={{
+          title: "Tournaments",
+          headerRight: () => (
+            <Pressable onPress={() => router.push("/settings")} hitSlop={12}>
+              {useSymbol ? (
+                <Image
+                  source="sf:gearshape"
+                  tintColor={
+                    PlatformColor("systemTeal") as unknown as string
+                  }
+                  style={{ width: 24, height: 24 }}
+                />
+              ) : (
+                <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                  Settings
+                </Text>
+              )}
+            </Pressable>
+          ),
+        }}
+      />
       <FlatList
         contentInsetAdjustmentBehavior="automatic"
         data={tournaments}
