@@ -2,7 +2,7 @@ import { Button, Card, Pill, colors } from "@/components/ui";
 import { generateNextRound } from "@/lib/scheduler";
 import { Match, updateTournament, useTournaments } from "@/store/tournaments";
 import { useTheme } from "@react-navigation/native";
-import { Link, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function TournamentScreen() {
@@ -10,6 +10,7 @@ export default function TournamentScreen() {
   const { tournaments } = useTournaments();
   const t = tournaments.find((x) => x.id === id);
   const { colors: tc } = useTheme();
+  const router = useRouter();
 
   if (!t) {
     return (
@@ -59,6 +60,7 @@ export default function TournamentScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: tc.background }}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -75,9 +77,12 @@ export default function TournamentScreen() {
 
       <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
         <Button title="+ New Round" onPress={addRound} style={{ flex: 1 }} />
-        <Link href={`/${t.id}/standings`} asChild>
-          <Button title="Standings" variant="secondary" onPress={() => {}} style={{ flex: 1 }} />
-        </Link>
+        <Button
+          title="Standings"
+          variant="secondary"
+          onPress={() => router.push(`/${t.id}/standings`)}
+          style={{ flex: 1 }}
+        />
       </View>
 
       {t.rounds.length === 0 && (

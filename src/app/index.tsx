@@ -6,7 +6,7 @@ import {
 } from "@/store/tournaments";
 import { useTheme } from "@react-navigation/native";
 import { Image } from "expo-image";
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import {
   Alert,
   FlatList,
@@ -114,11 +114,11 @@ export default function Home() {
         }}
       />
       <View style={styles.fab}>
-        <Link href="/new" asChild>
-          <Pressable>
-            <GlassFab icon="plus" label="New Tournament" onPress={() => {}} />
-          </Pressable>
-        </Link>
+        <GlassFab
+          icon="plus"
+          label="New Tournament"
+          onPress={() => router.push("/new")}
+        />
       </View>
     </View>
   );

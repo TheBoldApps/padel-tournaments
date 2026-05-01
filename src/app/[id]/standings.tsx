@@ -22,6 +22,7 @@ export default function Standings() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: tc.background }}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{ padding: 16 }}
     >
       <Text style={[styles.title, { color: tc.text }]}>{t.name}</Text>

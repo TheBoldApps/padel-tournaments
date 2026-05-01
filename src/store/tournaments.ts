@@ -30,23 +30,37 @@ export type Tournament = {
 type State = { tournaments: Tournament[] };
 
 let state: State = { tournaments: [] };
+let hydrated = false;
 const listeners = new Set<() => void>();
 
 const STORAGE_KEY = "padel-tournaments-v1";
 
 AsyncStorage.getItem(STORAGE_KEY)
   .then((raw) => {
-    if (!raw || state.tournaments.length > 0) return;
-    try {
-      state = JSON.parse(raw);
-      listeners.forEach((l) => l());
-    } catch {}
+    if (raw) {
+      try {
+        const persisted: State = JSON.parse(raw);
+        const seen = new Set(state.tournaments.map((t) => t.id));
+        const merged = [
+          ...state.tournaments,
+          ...persisted.tournaments.filter((t) => !seen.has(t.id)),
+        ];
+        state = { tournaments: merged };
+      } catch {}
+    }
+    hydrated = true;
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+    listeners.forEach((l) => l());
   })
-  .catch(() => {});
+  .catch(() => {
+    hydrated = true;
+  });
 
 function setState(next: State) {
   state = next;
-  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+  if (hydrated) {
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+  }
   listeners.forEach((l) => l());
 }
 
