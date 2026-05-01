@@ -12,11 +12,23 @@ import {
 } from "react-native";
 
 export const colors = {
-  primary: "#0EA5A4",
-  primaryDark: "#0B7C7B",
-  accent: "#F59E0B",
+  primary: "#14B8A6",
+  primaryDark: "#0F766E",
+  accent: "#F97316",
+  accentDark: "#C2410C",
   danger: "#EF4444",
+  success: "#22C55E",
+  blue: "#3B82F6",
+  indigo: "#6366F1",
+  purple: "#8B5CF6",
+  pink: "#EC4899",
+  amber: "#F59E0B",
 };
+
+export const formatColors = {
+  americano: { tint: "#14B8A6", soft: "#CCFBF1", deep: "#0F766E", text: "#134E4A" },
+  mexicano: { tint: "#F97316", soft: "#FFEDD5", deep: "#C2410C", text: "#7C2D12" },
+} as const;
 
 export function AdaptiveGlass({
   children,

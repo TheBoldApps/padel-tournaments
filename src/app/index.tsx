@@ -1,4 +1,4 @@
-import { AdaptiveGlass, GlassFab, colors } from "@/components/ui";
+import { AdaptiveGlass, GlassFab, colors, formatColors } from "@/components/ui";
 import { refetch } from "@/lib/sync";
 import {
   deleteTournament,
@@ -119,18 +119,20 @@ export default function Home() {
             (s, r) => s + r.matches.length,
             0
           );
+          const fc = formatColors[item.format];
           return (
             <Pressable
               onPress={() => router.push(`/${item.id}`)}
               onLongPress={() => confirmDelete(item.id, item.name)}
             >
               <AdaptiveGlass style={styles.card}>
+                <View style={[styles.accentStripe, { backgroundColor: fc.tint }]} />
                 <View style={styles.topRow}>
-                  <Text style={styles.format}>
-                    {item.format === "americano"
-                      ? "Classic Americano"
-                      : "Classic Mexicano"}
-                  </Text>
+                  <View style={[styles.formatPill, { backgroundColor: fc.soft }]}>
+                    <Text style={[styles.formatPillText, { color: fc.deep }]}>
+                      {item.format === "americano" ? "Americano" : "Mexicano"}
+                    </Text>
+                  </View>
                   <Text style={styles.date}>
                     {DATE_FORMAT.format(new Date(item.createdAt))}
                   </Text>
@@ -138,8 +140,23 @@ export default function Home() {
                 <Text style={styles.name}>{item.name}</Text>
                 <View style={styles.divider} />
                 <Text style={styles.meta}>
-                  {item.players.length} Players · {item.rounds.length} Rounds
-                  {totalMatches ? ` · ${totalMatches} Matches` : ""}
+                  <Text style={{ color: fc.deep, fontWeight: "700" }}>
+                    {item.players.length}
+                  </Text>{" "}
+                  Players ·{" "}
+                  <Text style={{ color: fc.deep, fontWeight: "700" }}>
+                    {item.rounds.length}
+                  </Text>{" "}
+                  Rounds
+                  {totalMatches ? (
+                    <>
+                      {" · "}
+                      <Text style={{ color: fc.deep, fontWeight: "700" }}>
+                        {totalMatches}
+                      </Text>{" "}
+                      Matches
+                    </>
+                  ) : null}
                 </Text>
               </AdaptiveGlass>
             </Pressable>
@@ -167,14 +184,32 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: 16,
+    paddingLeft: 20,
     borderRadius: 16,
     borderCurve: "continuous",
+    overflow: "hidden",
   },
-  topRow: { flexDirection: "row", justifyContent: "space-between" },
-  format: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: PlatformColor("secondaryLabel") as unknown as string,
+  accentStripe: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  formatPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  formatPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
   date: {
     fontSize: 14,

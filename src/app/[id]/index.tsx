@@ -1,4 +1,4 @@
-import { AdaptiveGlass, Button } from "@/components/ui";
+import { AdaptiveGlass, Button, formatColors } from "@/components/ui";
 import { MatchCard } from "@/components/match-card";
 import { MenuSheet, type MenuItem } from "@/components/menu-sheet";
 import { RoundPillSelector } from "@/components/round-pill-selector";
@@ -40,6 +40,7 @@ export default function TournamentScreen() {
   }
 
   const finished = t.finishedAt != null;
+  const fc = formatColors[t.format];
 
   const addRound = () => {
     const round = generateNextRound(t);
@@ -173,9 +174,11 @@ export default function TournamentScreen() {
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{t.name}</Text>
-          <Text style={styles.subtitle}>
-            {t.format === "americano" ? "Classic Americano" : "Classic Mexicano"}
-          </Text>
+          <View style={[styles.formatPill, { backgroundColor: fc.soft }]}>
+            <Text style={[styles.formatPillText, { color: fc.deep }]}>
+              {t.format === "americano" ? "Americano" : "Mexicano"}
+            </Text>
+          </View>
           <Text style={styles.subtitle}>
             {new Date(t.createdAt).toLocaleDateString(undefined, {
               day: "numeric",
@@ -186,18 +189,22 @@ export default function TournamentScreen() {
         </View>
         <View style={{ alignItems: "flex-end", gap: 8 }}>
           <View style={styles.statRow}>
-            <Text style={styles.statValue}>{t.pointsPerMatch}</Text>
+            <Text style={[styles.statValue, { color: fc.deep }]}>
+              {t.pointsPerMatch}
+            </Text>
             <Image
               source="sf:scope"
-              tintColor={PlatformColor("secondaryLabel") as unknown as string}
+              tintColor={fc.tint}
               style={{ width: 18, height: 18 }}
             />
           </View>
           <View style={styles.statRow}>
-            <Text style={styles.statValue}>{t.players.length}</Text>
+            <Text style={[styles.statValue, { color: fc.deep }]}>
+              {t.players.length}
+            </Text>
             <Image
               source="sf:person.2.fill"
-              tintColor={PlatformColor("secondaryLabel") as unknown as string}
+              tintColor={fc.tint}
               style={{ width: 18, height: 18 }}
             />
           </View>
@@ -297,8 +304,20 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    marginTop: 2,
+    marginTop: 6,
     color: PlatformColor("secondaryLabel") as unknown as string,
+  },
+  formatPill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginTop: 8,
+  },
+  formatPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
   statRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   statValue: {

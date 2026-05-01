@@ -34,7 +34,7 @@
       "expo-secure-store",
       "expo-apple-authentication"
     ],
-    "name": "Padel",
+    "name": "Padel HQ",
     "slug": "tournament-pedal-organizer",
     "owner": "theboldapps",
     "ios": {
