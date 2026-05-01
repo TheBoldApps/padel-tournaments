@@ -82,6 +82,10 @@ function RootStack() {
           options={{ title: "Round Breakdown", headerLargeTitle: false }}
         />
         <Stack.Screen
+          name="[id]/standings/csv"
+          options={{ title: "Export CSV", headerLargeTitle: false }}
+        />
+        <Stack.Screen
           name="settings"
           options={{
             title: "Settings",
