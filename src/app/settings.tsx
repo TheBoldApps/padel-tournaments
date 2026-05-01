@@ -15,7 +15,7 @@ export default function Settings() {
 
   const onSignOut = () => {
     Alert.alert("Sign out?", "You'll need to sign back in to sync changes.", [
-      { text: "Cancel" },
+      { text: "Cancel", style: "cancel" },
       {
         text: "Sign out",
         style: "destructive",

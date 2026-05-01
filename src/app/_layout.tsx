@@ -76,6 +76,7 @@ function RootStack() {
           name="settings"
           options={{
             title: "Settings",
+            headerLargeTitle: false,
             presentation: "formSheet",
             contentStyle: { backgroundColor: "transparent" },
           }}
@@ -92,6 +93,7 @@ function RootStack() {
           name="sign-in"
           options={{
             title: "Sign in",
+            headerLargeTitle: false,
             presentation: "formSheet",
             contentStyle: { backgroundColor: "transparent" },
           }}

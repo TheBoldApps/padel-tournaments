@@ -3,6 +3,7 @@ import { SettingsRow, SettingsSection } from "@/components/settings-row";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import * as AppleAuthentication from "expo-apple-authentication";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -27,7 +28,11 @@ export default function Profile() {
       data: { display_name: name },
     });
     setSaving(false);
-    if (error) Alert.alert("Couldn't save", error.message);
+    if (error) {
+      Alert.alert("Couldn't save", error.message);
+      return;
+    }
+    if (router.canGoBack()) router.back();
   };
 
   const linkApple = async () => {
