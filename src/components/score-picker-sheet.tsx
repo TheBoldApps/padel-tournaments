@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +21,11 @@ type Props = {
   onReset: () => void;
 };
 
+const COLS = 4;
+const GAP = 10;
+const SHEET_PAD_H = 20;
+const MAX_CONTENT_WIDTH = 460;
+
 export function ScorePickerSheet({
   visible,
   onClose,
@@ -30,6 +36,13 @@ export function ScorePickerSheet({
   onReset,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+
+  const contentWidth = Math.min(
+    screenW - SHEET_PAD_H * 2,
+    MAX_CONTENT_WIDTH
+  );
+  const cellSize = Math.floor((contentWidth - GAP * (COLS - 1)) / COLS);
 
   const handlePick = (n: number) => {
     onPick(n);
@@ -87,56 +100,59 @@ export function ScorePickerSheet({
             paddingBottom: Math.max(insets.bottom, 24),
           }}
         >
-          <Pressable onPress={() => {}}>
+          <Pressable onPress={() => {}} style={styles.sheetInner}>
             <View style={styles.dragHandle} />
-            <Text style={styles.title}>{title}</Text>
+            <View style={[styles.content, { width: contentWidth }]}>
+              <Text style={styles.title}>{title}</Text>
 
-            <View style={styles.grid}>
-              {cells.map((n) => {
-                const selected = n === currentScore;
-                return (
-                  <Pressable
-                    key={n}
-                    onPress={() => handlePick(n)}
-                    style={({ pressed }) => [
-                      styles.cell,
-                      selected && { backgroundColor: colors.primary },
-                      pressed && { transform: [{ scale: 0.96 }] },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.cellText,
-                        {
-                          color: selected
-                            ? "#FFFFFF"
-                            : (PlatformColor("label") as unknown as string),
-                        },
+              <View style={styles.grid}>
+                {cells.map((n) => {
+                  const selected = n === currentScore;
+                  return (
+                    <Pressable
+                      key={n}
+                      onPress={() => handlePick(n)}
+                      style={({ pressed }) => [
+                        styles.cell,
+                        { width: cellSize, height: cellSize },
+                        selected && { backgroundColor: colors.primary },
+                        pressed && { transform: [{ scale: 0.96 }] },
                       ]}
                     >
-                      {String(n).padStart(2, "0")}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                      <Text
+                        style={[
+                          styles.cellText,
+                          {
+                            color: selected
+                              ? "#FFFFFF"
+                              : (PlatformColor("label") as unknown as string),
+                          },
+                        ]}
+                      >
+                        {String(n).padStart(2, "0")}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Pressable onPress={handleCustom} style={styles.customBtn}>
+                <Text style={styles.customText}>Enter Custom Score</Text>
+              </Pressable>
+              {showCustomHint ? (
+                <Text style={styles.customHint}>
+                  Tap &quot;Enter Custom Score&quot; for higher values.
+                </Text>
+              ) : null}
+
+              <Pressable
+                onPress={resetDisabled ? undefined : handleReset}
+                disabled={resetDisabled}
+                style={[styles.resetBtn, { opacity: resetDisabled ? 0.4 : 1 }]}
+              >
+                <Text style={styles.resetText}>Reset</Text>
+              </Pressable>
             </View>
-
-            <Pressable onPress={handleCustom} style={styles.customBtn}>
-              <Text style={styles.customText}>Enter Custom Score</Text>
-            </Pressable>
-            {showCustomHint ? (
-              <Text style={styles.customHint}>
-                Tap "Enter Custom Score" for higher values.
-              </Text>
-            ) : null}
-
-            <Pressable
-              onPress={resetDisabled ? undefined : handleReset}
-              disabled={resetDisabled}
-              style={[styles.resetBtn, { opacity: resetDisabled ? 0.4 : 1 }]}
-            >
-              <Text style={styles.resetText}>Reset</Text>
-            </Pressable>
           </Pressable>
         </AdaptiveGlass>
       </Pressable>
@@ -156,14 +172,19 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     borderCurve: "continuous",
     paddingTop: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: SHEET_PAD_H,
+  },
+  sheetInner: {
+    alignItems: "center",
+  },
+  content: {
+    alignSelf: "center",
   },
   dragHandle: {
     width: 36,
     height: 5,
     borderRadius: 999,
     backgroundColor: PlatformColor("tertiaryLabel") as unknown as string,
-    alignSelf: "center",
     marginBottom: 14,
   },
   title: {
@@ -176,13 +197,10 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: GAP,
     justifyContent: "flex-start",
   },
   cell: {
-    width: "18%",
-    aspectRatio: 1,
-    padding: 14,
     borderRadius: 14,
     borderCurve: "continuous",
     backgroundColor: PlatformColor("systemBackground") as unknown as string,
