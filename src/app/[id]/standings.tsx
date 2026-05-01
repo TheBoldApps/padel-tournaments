@@ -1,17 +1,22 @@
 import { Card } from "@/components/ui";
-import { getTournament, playerStandings, useTournaments } from "@/store/tournaments";
+import { playerStandings, useTournaments } from "@/store/tournaments";
 import { useTheme } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
-import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function Standings() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  useTournaments();
-  const t = useMemo(() => getTournament(id), [id, useTournaments()]);
+  const { tournaments } = useTournaments();
+  const t = tournaments.find((x) => x.id === id);
   const { colors: tc } = useTheme();
 
-  if (!t) return null;
+  if (!t) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text style={{ color: tc.text }}>Tournament not found.</Text>
+      </View>
+    );
+  }
   const standings = playerStandings(t);
 
   return (

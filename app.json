@@ -32,7 +32,17 @@
         }
       ]
     ],
-    "name": "Tournament Pedal Organizer",
-    "owner": "theboldapps"
+    "name": "Padel",
+    "slug": "tournament-pedal-organizer",
+    "owner": "theboldapps",
+    "ios": {
+      "bundleIdentifier": "com.anonymous.tournament-pedal-organizer"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ee686892-524b-475d-aa74-e813aebbc046"
+      }
+    }
   }
 }

@@ -23,10 +23,10 @@ export function generateAmericanoRound(t: Tournament): Round {
   const courts = Math.floor(t.players.length / 4);
   const needed = courts * 4;
   const sortedByRest = [...t.players].sort(
-    (a, b) => restCounts[a] - restCounts[b] || Math.random() - 0.5
+    (a, b) => restCounts[b] - restCounts[a] || Math.random() - 0.5
   );
-  const resting = sortedByRest.slice(needed);
   const playing = sortedByRest.slice(0, needed);
+  const resting = sortedByRest.slice(needed);
 
   const best = bestMatching(playing, partnered, opposed);
   const matches: Match[] = best.map((m, i) => ({
@@ -103,7 +103,7 @@ export function generateMexicanoRound(t: Tournament): Round {
   const courts = Math.floor(t.players.length / 4);
   const needed = courts * 4;
   const ranked = [...t.players].sort((a, b) => {
-    const r = restCounts[a] - restCounts[b];
+    const r = restCounts[b] - restCounts[a];
     if (r !== 0) return r;
     return points[b] - points[a];
   });

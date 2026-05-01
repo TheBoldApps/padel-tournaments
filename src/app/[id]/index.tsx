@@ -1,22 +1,15 @@
 import { Button, Card, Pill, colors } from "@/components/ui";
 import { generateNextRound } from "@/lib/scheduler";
-import {
-  Match,
-  getTournament,
-  updateTournament,
-  useTournaments,
-} from "@/store/tournaments";
+import { Match, updateTournament, useTournaments } from "@/store/tournaments";
 import { useTheme } from "@react-navigation/native";
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo } from "react";
+import { Link, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function TournamentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  useTournaments();
-  const t = useMemo(() => getTournament(id), [id, useTournaments()]);
+  const { tournaments } = useTournaments();
+  const t = tournaments.find((x) => x.id === id);
   const { colors: tc } = useTheme();
-  const router = useRouter();
 
   if (!t) {
     return (

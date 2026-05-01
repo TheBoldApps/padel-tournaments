@@ -1,11 +1,13 @@
 import { Button, Card, colors } from "@/components/ui";
 import { Format, createTournament } from "@/store/tournaments";
 import { useTheme } from "@react-navigation/native";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  PlatformColor,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +25,8 @@ export default function NewTournament() {
   const [playerInput, setPlayerInput] = useState("");
   const [players, setPlayers] = useState<string[]>([]);
 
+  const useSymbol = process.env.EXPO_OS === "ios";
+
   const addPlayer = () => {
     const n = playerInput.trim();
     if (!n) return;
@@ -33,15 +37,16 @@ export default function NewTournament() {
 
   const remove = (p: string) => setPlayers(players.filter((x) => x !== p));
 
+  const pointsInt = Math.floor(Number(points));
   const canCreate =
-    name.trim().length > 0 && players.length >= 4 && Number(points) > 0;
+    name.trim().length > 0 && players.length >= 4 && Number.isFinite(pointsInt) && pointsInt > 0;
 
   const create = () => {
     if (!canCreate) return;
     const t = createTournament({
       name: name.trim(),
       format,
-      pointsPerMatch: Number(points),
+      pointsPerMatch: pointsInt,
       players,
     });
     router.replace(`/${t.id}`);
@@ -49,15 +54,23 @@ export default function NewTournament() {
 
   const inputStyle = [
     styles.input,
-    { color: tc.text, borderColor: tc.border, backgroundColor: tc.card },
+    {
+      color: tc.text,
+      borderColor: tc.border,
+      backgroundColor: tc.card,
+      borderCurve: "continuous" as const,
+    },
   ];
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1, backgroundColor: tc.background }}
+      style={{ flex: 1 }}
     >
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+      >
         <Text style={[styles.label, { color: tc.text }]}>Tournament name</Text>
         <TextInput
           value={name}
@@ -109,7 +122,7 @@ export default function NewTournament() {
           <Button title="Add" onPress={addPlayer} variant="secondary" />
         </View>
         {players.length > 0 && (
-          <Card style={{ marginTop: 10 }}>
+          <Card glass style={{ marginTop: 10 }}>
             {players.map((p, i) => (
               <View
                 key={p}
@@ -118,7 +131,7 @@ export default function NewTournament() {
                   justifyContent: "space-between",
                   alignItems: "center",
                   paddingVertical: 8,
-                  borderBottomWidth: i === players.length - 1 ? 0 : 1,
+                  borderBottomWidth: i === players.length - 1 ? 0 : StyleSheet.hairlineWidth,
                   borderBottomColor: tc.border,
                 }}
               >
@@ -126,7 +139,15 @@ export default function NewTournament() {
                   {i + 1}. {p}
                 </Text>
                 <Pressable onPress={() => remove(p)} hitSlop={10}>
-                  <Text style={{ color: colors.danger }}>Remove</Text>
+                  {useSymbol ? (
+                    <Image
+                      source="sf:minus.circle.fill"
+                      tintColor={colors.danger}
+                      style={{ width: 22, height: 22 }}
+                    />
+                  ) : (
+                    <Text style={{ color: colors.danger }}>Remove</Text>
+                  )}
                 </Pressable>
               </View>
             ))}
@@ -173,13 +194,22 @@ function FormatChip({
       style={{
         flex: 1,
         padding: 14,
-        borderRadius: 12,
+        borderRadius: 14,
+        borderCurve: "continuous",
         borderWidth: 2,
         borderColor: active ? colors.primary : tc.border,
         backgroundColor: active ? colors.primary + "15" : tc.card,
       }}
     >
-      <Text style={{ color: tc.text, fontSize: 16, fontWeight: "700" }}>{label}</Text>
+      <Text
+        style={{
+          color: active ? colors.primary : (PlatformColor("label") as unknown as string),
+          fontSize: 16,
+          fontWeight: "700",
+        }}
+      >
+        {label}
+      </Text>
       <Text style={{ color: tc.text, opacity: 0.7, fontSize: 12, marginTop: 2 }}>{sub}</Text>
     </Pressable>
   );
@@ -189,7 +219,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: "600", marginTop: 16, marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     fontSize: 16,
   },

@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSyncExternalStore } from "react";
 
 export type Format = "americano" | "mexicano";
@@ -33,25 +34,19 @@ const listeners = new Set<() => void>();
 
 const STORAGE_KEY = "padel-tournaments-v1";
 
-function load() {
-  if (typeof localStorage === "undefined") return;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) state = JSON.parse(raw);
-  } catch {}
-}
-load();
-
-function persist() {
-  if (typeof localStorage === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
-}
+AsyncStorage.getItem(STORAGE_KEY)
+  .then((raw) => {
+    if (!raw || state.tournaments.length > 0) return;
+    try {
+      state = JSON.parse(raw);
+      listeners.forEach((l) => l());
+    } catch {}
+  })
+  .catch(() => {});
 
 function setState(next: State) {
   state = next;
-  persist();
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
   listeners.forEach((l) => l());
 }
 

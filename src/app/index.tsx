@@ -1,12 +1,21 @@
-import { Button, Card, Pill, colors } from "@/components/ui";
+import { Card, GlassFab, Pill, colors } from "@/components/ui";
 import {
   deleteTournament,
   playerStandings,
   useTournaments,
 } from "@/store/tournaments";
 import { useTheme } from "@react-navigation/native";
+import { Image } from "expo-image";
 import { Link, useRouter } from "expo-router";
-import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  PlatformColor,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 export default function Home() {
   const { tournaments } = useTournaments();
@@ -14,7 +23,7 @@ export default function Home() {
   const router = useRouter();
 
   const confirmDelete = (id: string, name: string) => {
-    if (Platform.OS === "web") {
+    if (process.env.EXPO_OS === "web") {
       if (confirm(`Delete "${name}"?`)) deleteTournament(id);
     } else {
       Alert.alert("Delete tournament", `Delete "${name}"?`, [
@@ -24,15 +33,27 @@ export default function Home() {
     }
   };
 
+  const useSymbol = process.env.EXPO_OS === "ios";
+
   return (
     <View style={[styles.container, { backgroundColor: tc.background }]}>
       <FlatList
+        contentInsetAdjustmentBehavior="automatic"
         data={tournaments}
         keyExtractor={(t) => t.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 10 }}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={[styles.emptyTitle, { color: tc.text }]}>🎾 No tournaments yet</Text>
+            {useSymbol ? (
+              <Image
+                source="sf:trophy"
+                tintColor={PlatformColor("secondaryLabel") as unknown as string}
+                style={{ width: 48, height: 48, marginBottom: 12 }}
+              />
+            ) : (
+              <Text style={[styles.emptyTitle, { color: tc.text }]}>🎾</Text>
+            )}
+            <Text style={[styles.emptyTitle, { color: tc.text }]}>No tournaments yet</Text>
             <Text style={{ color: tc.text, opacity: 0.7, textAlign: "center", marginTop: 6 }}>
               Create your first Americano or Mexicano to get started.
             </Text>
@@ -48,14 +69,22 @@ export default function Home() {
           );
           return (
             <Pressable onPress={() => router.push(`/${item.id}`)}>
-              <Card>
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Card glass>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={[styles.name, { color: tc.text }]}>{item.name}</Text>
                   <Pressable onPress={() => confirmDelete(item.id, item.name)} hitSlop={10}>
-                    <Text style={{ color: colors.danger, fontWeight: "600" }}>Delete</Text>
+                    {useSymbol ? (
+                      <Image
+                        source="sf:trash"
+                        tintColor={colors.danger}
+                        style={{ width: 18, height: 18 }}
+                      />
+                    ) : (
+                      <Text style={{ color: colors.danger, fontWeight: "600" }}>Delete</Text>
+                    )}
                   </Pressable>
                 </View>
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                   <Pill
                     text={item.format === "americano" ? "Americano" : "Mexicano"}
                     color={item.format === "americano" ? colors.primary : colors.accent}
@@ -64,9 +93,20 @@ export default function Home() {
                   <Pill text={`${played}/${totalMatches} matches`} color="#10B981" />
                 </View>
                 {leader && leader.played > 0 && (
-                  <Text style={{ color: tc.text, marginTop: 8, opacity: 0.8 }}>
-                    🏆 Leading: {leader.player} ({leader.points} pts)
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
+                    {useSymbol ? (
+                      <Image
+                        source="sf:trophy.fill"
+                        tintColor={colors.accent}
+                        style={{ width: 14, height: 14 }}
+                      />
+                    ) : (
+                      <Text>🏆</Text>
+                    )}
+                    <Text style={{ color: tc.text, opacity: 0.85 }}>
+                      Leading: {leader.player} ({leader.points} pts)
+                    </Text>
+                  </View>
                 )}
               </Card>
             </Pressable>
@@ -75,7 +115,9 @@ export default function Home() {
       />
       <View style={styles.fab}>
         <Link href="/new" asChild>
-          <Button title="+ New Tournament" onPress={() => {}} />
+          <Pressable>
+            <GlassFab icon="plus" label="New Tournament" onPress={() => {}} />
+          </Pressable>
         </Link>
       </View>
     </View>
@@ -87,5 +129,5 @@ const styles = StyleSheet.create({
   name: { fontSize: 18, fontWeight: "700" },
   empty: { alignItems: "center", paddingTop: 80, paddingHorizontal: 24 },
   emptyTitle: { fontSize: 20, fontWeight: "700" },
-  fab: { position: "absolute", bottom: 24, left: 16, right: 16 },
+  fab: { position: "absolute", bottom: 28, alignSelf: "center" },
 });

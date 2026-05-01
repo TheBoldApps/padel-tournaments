@@ -1,5 +1,15 @@
 import { useTheme } from "@react-navigation/native";
-import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { BlurView } from "expo-blur";
+import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
+import { Image } from "expo-image";
+import {
+  PlatformColor,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from "react-native";
 
 export const colors = {
   primary: "#0EA5A4",
@@ -7,6 +17,50 @@ export const colors = {
   accent: "#F59E0B",
   danger: "#EF4444",
 };
+
+export function AdaptiveGlass({
+  children,
+  style,
+  isInteractive,
+  tint = "systemMaterial",
+  intensity = 80,
+}: {
+  children?: React.ReactNode;
+  style?: ViewStyle;
+  isInteractive?: boolean;
+  tint?: React.ComponentProps<typeof BlurView>["tint"];
+  intensity?: number;
+}) {
+  if (process.env.EXPO_OS === "ios" && isLiquidGlassAvailable()) {
+    return (
+      <GlassView isInteractive={isInteractive} style={style}>
+        {children}
+      </GlassView>
+    );
+  }
+  if (process.env.EXPO_OS === "ios") {
+    return (
+      <BlurView
+        tint={tint}
+        intensity={intensity}
+        style={[{ overflow: "hidden" }, style]}
+      >
+        {children}
+      </BlurView>
+    );
+  }
+  // Android / web fallback — translucent material-ish surface
+  return (
+    <View
+      style={[
+        { backgroundColor: "rgba(255,255,255,0.06)", overflow: "hidden" },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
 
 export function Button({
   title,
@@ -42,6 +96,7 @@ export function Button({
           opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
           borderWidth: variant === "ghost" ? 1 : 0,
           borderColor: tc.border,
+          borderCurve: "continuous",
         },
         style,
       ]}
@@ -51,13 +106,93 @@ export function Button({
   );
 }
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function GlassFab({
+  icon,
+  label,
+  onPress,
+  disabled,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  const useSymbol = process.env.EXPO_OS === "ios";
+  return (
+    <AdaptiveGlass
+      isInteractive
+      style={{
+        borderRadius: 28,
+        borderCurve: "continuous",
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          paddingVertical: 14,
+          paddingHorizontal: 22,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        {useSymbol ? (
+          <Image
+            source={`sf:${icon}`}
+            tintColor={PlatformColor("label") as unknown as string}
+            style={{ width: 20, height: 20 }}
+          />
+        ) : null}
+        <Text
+          style={{
+            color: PlatformColor("label") as unknown as string,
+            fontSize: 16,
+            fontWeight: "700",
+          }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </AdaptiveGlass>
+  );
+}
+
+export function Card({
+  children,
+  style,
+  glass,
+}: {
+  children: React.ReactNode;
+  style?: ViewStyle;
+  glass?: boolean;
+}) {
   const { colors: tc } = useTheme();
+  if (glass) {
+    return (
+      <AdaptiveGlass
+        style={StyleSheet.flatten([
+          styles.card,
+          { borderColor: tc.border, borderCurve: "continuous" as const },
+          style,
+        ])}
+      >
+        {children}
+      </AdaptiveGlass>
+    );
+  }
   return (
     <View
       style={[
         styles.card,
-        { backgroundColor: tc.card, borderColor: tc.border },
+        {
+          backgroundColor: tc.card,
+          borderColor: tc.border,
+          borderCurve: "continuous",
+        },
         style,
       ]}
     >
@@ -80,16 +215,17 @@ const styles = StyleSheet.create({
   btn: {
     paddingVertical: 12,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   btnText: { fontWeight: "600", fontSize: 15 },
   card: {
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 14,
     borderWidth: 1,
     marginBottom: 10,
+    overflow: "hidden",
   },
   pill: {
     paddingHorizontal: 10,
