@@ -119,13 +119,30 @@ export function generateMexicanoRound(t: Tournament): Round {
     .filter((p) => !restingSet.has(p))
     .sort((a, b) => points[b] - points[a]);
 
+  const partnered = new Set<string>();
+  for (const r of t.rounds) {
+    for (const m of r.matches) {
+      partnered.add(pairKey(m.teamA[0], m.teamA[1]));
+      partnered.add(pairKey(m.teamB[0], m.teamB[1]));
+    }
+  }
+
   const matches: Match[] = [];
   for (let i = 0; i < playing.length; i += 4) {
     const g = playing.slice(i, i + 4);
+    // Default Mexicano pairing: rank 1+4 vs 2+3.
+    let teamA: [string, string] = [g[0], g[3]];
+    let teamB: [string, string] = [g[1], g[2]];
+    // If either pair already played as partners, swap to 1+3 vs 2+4.
+    if (partnered.has(pairKey(teamA[0], teamA[1])) ||
+        partnered.has(pairKey(teamB[0], teamB[1]))) {
+      teamA = [g[0], g[2]];
+      teamB = [g[1], g[3]];
+    }
     matches.push({
       court: matches.length + 1,
-      teamA: [g[0], g[3]],
-      teamB: [g[1], g[2]],
+      teamA,
+      teamB,
       scoreA: null,
       scoreB: null,
     });

@@ -56,3 +56,46 @@ describe("generateMexicanoRound — court assignment by points only", () => {
     expect(onCourt.has("P2")).toBe(true);
   });
 });
+
+describe("generateMexicanoRound — avoid immediate repeat partnerships", () => {
+  test("same court 4 with identical scores swaps to alternate pairing", () => {
+    // 4 players, round 1: A+D vs B+C, A+D won 16-0.
+    // Round 2 ranking: A,D tied at 16; B,C tied at 0.
+    // Default Mexicano pairing for [A,D,B,C] sorted is rank 1+4 vs 2+3 -> A+C vs D+B
+    // (different from round 1, fine). For [A,B,C,D] sorted, default is A+D vs B+C
+    // == round 1. We want to verify the NEW partnerships in round 2 do NOT repeat
+    // round-1 partnerships.
+    const players = ["A", "B", "C", "D"];
+    const t: Tournament = {
+      id: "t",
+      name: "T",
+      format: "mexicano",
+      pointsPerMatch: 16,
+      players,
+      rounds: [
+        {
+          number: 1,
+          matches: [
+            {
+              court: 1,
+              teamA: ["A", "D"],
+              teamB: ["B", "C"],
+              scoreA: 16,
+              scoreB: 0,
+            },
+          ],
+          resting: [],
+        },
+      ],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+
+    const r = generateMexicanoRound(t);
+    const partners = (m: { teamA: string[]; teamB: string[] }) =>
+      [m.teamA.slice().sort().join(""), m.teamB.slice().sort().join("")].sort();
+    const r1 = partners(t.rounds[0].matches[0]);
+    const r2 = partners(r.matches[0]);
+    expect(r2).not.toEqual(r1);
+  });
+});
