@@ -45,14 +45,18 @@ export default function Profile() {
         ],
       });
       if (!credential.identityToken) throw new Error("No identity token");
-      // While the anonymous session is active, signing in with Apple links the identity
-      // and preserves the same auth.users.id.
+      // signInWithIdToken from an anon session will:
+      //   - Link the Apple identity to the existing user_id IF "Manual linking"
+      //     is enabled in Supabase Auth settings (preserves tournaments cleanly).
+      //   - Otherwise, create a new user. The SyncDriver will then re-push the
+      //     local tournaments under the new owner_id, so the user keeps their
+      //     data either way; only the abandoned anon row is orphaned in the DB.
       const { error } = await supabase.auth.signInWithIdToken({
         provider: "apple",
         token: credential.identityToken,
       });
       if (error) throw error;
-      Alert.alert("Linked", "Your account is now signed in with Apple.");
+      if (router.canGoBack()) router.back();
     } catch (e: any) {
       if (e.code === "ERR_REQUEST_CANCELED") return;
       Alert.alert("Couldn't link Apple", String(e?.message ?? e));

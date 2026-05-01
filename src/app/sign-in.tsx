@@ -20,18 +20,26 @@ export default function SignIn() {
   const [code, setCode] = useState("");
   const [stage, setStage] = useState<"email" | "code">("email");
   const [loading, setLoading] = useState(false);
+  // True when the verify step should bind the new email to the current
+  // (anonymous) user instead of starting a fresh session.
+  const [isUpgrade, setIsUpgrade] = useState(false);
 
   const sendCode = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    const upgrading = Boolean(user?.is_anonymous);
+    const { error } = upgrading
+      ? await supabase.auth.updateUser({ email })
+      : await supabase.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: true },
+        });
     setLoading(false);
     if (error) {
       Alert.alert("Couldn't send code", error.message);
       return;
     }
+    setIsUpgrade(upgrading);
     setStage("code");
   };
 
@@ -40,7 +48,7 @@ export default function SignIn() {
     const { error } = await supabase.auth.verifyOtp({
       email,
       token: code,
-      type: "email",
+      type: isUpgrade ? "email_change" : "email",
     });
     setLoading(false);
     if (error) {
