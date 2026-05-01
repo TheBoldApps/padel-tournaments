@@ -5,7 +5,7 @@
     "scheme": "acme",
     "userInterfaceStyle": "automatic",
     "web": {
-      "output": "server"
+      "output": "static"
     },
     "android": {
       "predictiveBackGestureEnabled": false
