@@ -24,7 +24,6 @@ export default function Layout() {
           options={{
             headerShown: false,
             presentation: "fullScreenModal",
-            contentStyle: { backgroundColor: "transparent" },
           }}
         />
         <Stack.Screen

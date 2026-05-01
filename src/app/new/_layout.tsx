@@ -13,7 +13,9 @@ export default function NewWizardLayout() {
           headerTitleStyle: { color: PlatformColor("label") as unknown as string },
           headerTintColor: PlatformColor("systemTeal") as unknown as string,
           headerBackButtonDisplayMode: "minimal",
-          contentStyle: { backgroundColor: "transparent" },
+          contentStyle: {
+            backgroundColor: PlatformColor("systemBackground") as unknown as string,
+          },
           headerLeft: () => <CancelButton />,
         }}
       >
