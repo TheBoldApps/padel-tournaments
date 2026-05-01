@@ -1,16 +1,43 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import { SessionProvider, useSession } from "@/lib/auth-context";
+import { refetch, startSync, stopSync } from "@/lib/sync";
+import { useTournaments } from "@/store/tournaments";
 import { Stack } from "expo-router";
-import { PlatformColor } from "react-native";
+import { useEffect, useRef } from "react";
+import { AppState, PlatformColor } from "react-native";
 
 export default function Layout() {
   return (
     <ThemeProvider>
       <SessionProvider>
+        <SyncDriver />
         <RootStack />
       </SessionProvider>
     </ThemeProvider>
   );
+}
+
+function SyncDriver() {
+  const { session } = useSession();
+  const { tournaments } = useTournaments();
+  const tournamentsRef = useRef(tournaments);
+  tournamentsRef.current = tournaments;
+
+  useEffect(() => {
+    if (!session) {
+      void stopSync();
+      return;
+    }
+    void startSync(tournamentsRef.current);
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void refetch(tournamentsRef.current);
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [session?.user.id]);
+
+  return null;
 }
 
 function RootStack() {
