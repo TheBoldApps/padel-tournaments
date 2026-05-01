@@ -1,6 +1,5 @@
-import { AdaptiveGlass, Button, colors } from "@/components/ui";
+import { AdaptiveGlass, colors } from "@/components/ui";
 import type { Format } from "@/store/tournaments";
-import { useTheme } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import {
   createContext,
@@ -14,6 +13,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  PlatformColor,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -95,23 +95,29 @@ export function useWizard(): WizardState {
 }
 
 export function ProgressBar({ step }: { step: WizardStep }) {
-  const { colors: tc } = useTheme();
   return (
-    <View style={chrome.progressRow}>
-      {[1, 2, 3, 4].map((n) => {
-        const filled = n <= step;
-        return (
-          <View
-            key={n}
-            style={[
-              chrome.progressSeg,
-              {
-                backgroundColor: filled ? colors.primary : tc.border,
-              },
-            ]}
-          />
-        );
-      })}
+    <View>
+      <Text style={chrome.stepCaption}>{`STEP ${step} OF 4`}</Text>
+      <View style={chrome.progressRow}>
+        {[1, 2, 3, 4].map((n) => {
+          const filled = n <= step;
+          return (
+            <View
+              key={n}
+              style={[
+                chrome.progressSeg,
+                {
+                  backgroundColor: filled
+                    ? colors.primary
+                    : (PlatformColor(
+                        "secondarySystemBackground"
+                      ) as unknown as string),
+                },
+              ]}
+            />
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -129,29 +135,77 @@ export function WizardFooter({
   const { isStepValid } = useWizard();
   const insets = useSafeAreaInsets();
   const showBack = step > 1;
+  const valid = isStepValid(step);
   return (
     <AdaptiveGlass
       style={{
         paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: Math.max(insets.bottom, 10),
+        paddingTop: 12,
+        paddingBottom: Math.max(insets.bottom, 12),
       }}
     >
       <View style={{ flexDirection: "row", gap: 10 }}>
         {showBack ? (
           <View style={{ flex: 1 }}>
-            <Button title="Back" variant="secondary" onPress={() => router.back()} />
+            <BigButton
+              title="Back"
+              variant="secondary"
+              onPress={() => router.back()}
+            />
           </View>
         ) : null}
         <View style={{ flex: showBack ? 2 : 1 }}>
-          <Button
+          <BigButton
             title={nextLabel ?? "Next"}
             onPress={onNext}
-            disabled={!isStepValid(step)}
+            disabled={!valid}
           />
         </View>
       </View>
     </AdaptiveGlass>
+  );
+}
+
+function BigButton({
+  title,
+  onPress,
+  disabled,
+  variant = "primary",
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  variant?: "primary" | "secondary";
+}) {
+  const isPrimary = variant === "primary";
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        chrome.bigBtn,
+        {
+          backgroundColor: isPrimary
+            ? colors.primary
+            : (PlatformColor(
+                "secondarySystemBackground"
+              ) as unknown as string),
+          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+        },
+      ]}
+    >
+      <Text
+        style={{
+          color: isPrimary
+            ? "#FFFFFF"
+            : (PlatformColor("label") as unknown as string),
+          fontSize: 17,
+          fontWeight: "700",
+        }}
+      >
+        {title}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -175,11 +229,14 @@ export function StepScreen({
     >
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[{ padding: 16, paddingBottom: 24 }, contentStyle]}
+        contentContainerStyle={[
+          { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32 },
+          contentStyle,
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <ProgressBar step={step} />
-        <View style={{ height: 18 }} />
+        <View style={{ height: 24 }} />
         {children}
       </ScrollView>
       <WizardFooter step={step} onNext={onNext} nextLabel={nextLabel} />
@@ -217,14 +274,29 @@ export function CancelButton() {
 }
 
 const chrome = StyleSheet.create({
+  stepCaption: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    color: PlatformColor("secondaryLabel") as unknown as string,
+    textAlign: "right",
+    marginBottom: 8,
+  },
   progressRow: {
     flexDirection: "row",
-    gap: 4,
+    gap: 6,
   },
   progressSeg: {
     flex: 1,
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     borderCurve: "continuous",
+  },
+  bigBtn: {
+    height: 52,
+    borderRadius: 16,
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
