@@ -1,11 +1,25 @@
 import type { Match, Round, Tournament } from "@/store/tournaments";
-import { playerStandings } from "@/store/tournaments";
 
 function pairKey(a: string, b: string) {
   return [a, b].sort().join("|");
 }
 
 export function generateAmericanoRound(t: Tournament): Round {
+  const courts = Math.max(
+    1,
+    Math.min(
+      Math.floor(t.players.length / 4),
+      t.courtsCount ?? Math.floor(t.players.length / 4)
+    )
+  );
+  if (courts < 1 || t.players.length < 4) {
+    return {
+      number: t.rounds.length + 1,
+      matches: [],
+      resting: [...t.players],
+    };
+  }
+
   const roundNum = t.rounds.length + 1;
   const partnered = new Set<string>();
   const opposed = new Set<string>();
@@ -21,13 +35,6 @@ export function generateAmericanoRound(t: Tournament): Round {
   for (const p of t.players) restCounts[p] = 0;
   for (const r of t.rounds) for (const p of r.resting) restCounts[p] = (restCounts[p] ?? 0) + 1;
 
-  const courts = Math.max(
-    1,
-    Math.min(
-      Math.floor(t.players.length / 4),
-      t.courtsCount ?? Math.floor(t.players.length / 4)
-    )
-  );
   const needed = courts * 4;
   const sortedByRest = [...t.players].sort(
     (a, b) => restCounts[b] - restCounts[a] || Math.random() - 0.5
@@ -89,9 +96,49 @@ function bestMatching(
   return best!;
 }
 
+function pickPairing(
+  g: string[],
+  partnered: Set<string>
+): { teamA: [string, string]; teamB: [string, string] } {
+  // Three Mexicano-friendly splits, in priority order:
+  //   default: 1+4 vs 2+3 (strongest+weakest pairing)
+  //   alt-1:   1+3 vs 2+4
+  //   alt-2:   1+2 vs 3+4 (top vs bottom — last resort, less balanced)
+  const splits: Array<{ teamA: [string, string]; teamB: [string, string] }> = [
+    { teamA: [g[0], g[3]], teamB: [g[1], g[2]] },
+    { teamA: [g[0], g[2]], teamB: [g[1], g[3]] },
+    { teamA: [g[0], g[1]], teamB: [g[2], g[3]] },
+  ];
+  for (const s of splits) {
+    if (
+      !partnered.has(pairKey(s.teamA[0], s.teamA[1])) &&
+      !partnered.has(pairKey(s.teamB[0], s.teamB[1]))
+    ) {
+      return s;
+    }
+  }
+  return splits[0]; // Every split has a repeat — pick default deterministically.
+}
+
 export function generateMexicanoRound(t: Tournament): Round {
-  const roundNum = t.rounds.length + 1;
   if (t.rounds.length === 0) return generateAmericanoRound(t);
+
+  const courts = Math.max(
+    1,
+    Math.min(
+      Math.floor(t.players.length / 4),
+      t.courtsCount ?? Math.floor(t.players.length / 4)
+    )
+  );
+  if (courts < 1 || t.players.length < 4) {
+    return {
+      number: t.rounds.length + 1,
+      matches: [],
+      resting: [...t.players],
+    };
+  }
+
+  const roundNum = t.rounds.length + 1;
 
   const points: Record<string, number> = {};
   for (const p of t.players) points[p] = 0;
@@ -107,13 +154,6 @@ export function generateMexicanoRound(t: Tournament): Round {
   for (const p of t.players) restCounts[p] = 0;
   for (const r of t.rounds) for (const p of r.resting) restCounts[p] = (restCounts[p] ?? 0) + 1;
 
-  const courts = Math.max(
-    1,
-    Math.min(
-      Math.floor(t.players.length / 4),
-      t.courtsCount ?? Math.floor(t.players.length / 4)
-    )
-  );
   const needed = courts * 4;
 
   // Pick who rests first: lowest by points, with rest-count as a stability
@@ -143,15 +183,7 @@ export function generateMexicanoRound(t: Tournament): Round {
   const matches: Match[] = [];
   for (let i = 0; i < playing.length; i += 4) {
     const g = playing.slice(i, i + 4);
-    // Default Mexicano pairing: rank 1+4 vs 2+3.
-    let teamA: [string, string] = [g[0], g[3]];
-    let teamB: [string, string] = [g[1], g[2]];
-    // If either pair already played as partners, swap to 1+3 vs 2+4.
-    if (partnered.has(pairKey(teamA[0], teamA[1])) ||
-        partnered.has(pairKey(teamB[0], teamB[1]))) {
-      teamA = [g[0], g[2]];
-      teamB = [g[1], g[3]];
-    }
+    const { teamA, teamB } = pickPairing(g, partnered);
     matches.push({
       court: matches.length + 1,
       teamA,
@@ -169,10 +201,31 @@ export function generateNextRound(t: Tournament): Round {
 }
 
 export function generateFinalRound(t: Tournament): Round {
-  const ranked = playerStandings(t).map((s) => s.player);
-  if (ranked.length < 4) {
+  if (t.players.length < 4) {
     throw new Error("Need at least 4 players to start a final round");
   }
+  // Always rank by points (regardless of t.sortBy) so the final round picks
+  // the actual top scorers. Bonuses count, sit-out compensation does not (the
+  // final is about play, not chair time).
+  const winBonus = t.winBonus ?? 0;
+  const drawBonus = t.drawBonus ?? 0;
+  const points: Record<string, number> = {};
+  for (const p of t.players) points[p] = 0;
+  for (const r of t.rounds) {
+    for (const m of r.matches) {
+      if (m.scoreA == null || m.scoreB == null) continue;
+      const aWin = m.scoreA > m.scoreB;
+      const bWin = m.scoreB > m.scoreA;
+      const tie = m.scoreA === m.scoreB;
+      for (const p of m.teamA) {
+        points[p] = (points[p] ?? 0) + m.scoreA + (aWin ? winBonus : tie ? drawBonus : 0);
+      }
+      for (const p of m.teamB) {
+        points[p] = (points[p] ?? 0) + m.scoreB + (bWin ? winBonus : tie ? drawBonus : 0);
+      }
+    }
+  }
+  const ranked = [...t.players].sort((a, b) => (points[b] ?? 0) - (points[a] ?? 0));
   const [p1, p2, p3, p4] = ranked;
   return {
     number: t.rounds.length + 1,

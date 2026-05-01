@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { generateMexicanoRound } from "./scheduler";
+import { generateAmericanoRound, generateMexicanoRound } from "./scheduler";
 import type { Tournament } from "@/store/tournaments";
 
 const baseTournament = (
@@ -97,5 +97,39 @@ describe("generateMexicanoRound — avoid immediate repeat partnerships", () => 
     const r1 = partners(t.rounds[0].matches[0]);
     const r2 = partners(r.matches[0]);
     expect(r2).not.toEqual(r1);
+  });
+});
+
+describe("scheduler — guards", () => {
+  test("americano with 3 players returns 0 matches and rests everyone", () => {
+    const t: Tournament = {
+      id: "t",
+      name: "T",
+      format: "americano",
+      pointsPerMatch: 16,
+      players: ["A", "B", "C"],
+      rounds: [],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const r = generateAmericanoRound(t);
+    expect(r.matches).toEqual([]);
+    expect(new Set(r.resting)).toEqual(new Set(["A", "B", "C"]));
+  });
+
+  test("mexicano round 1 with 3 players returns 0 matches and rests everyone", () => {
+    const t: Tournament = {
+      id: "t",
+      name: "T",
+      format: "mexicano",
+      pointsPerMatch: 16,
+      players: ["A", "B", "C"],
+      rounds: [],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const r = generateMexicanoRound(t);
+    expect(r.matches).toEqual([]);
+    expect(new Set(r.resting)).toEqual(new Set(["A", "B", "C"]));
   });
 });

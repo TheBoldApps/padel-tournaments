@@ -49,6 +49,7 @@ type State = { tournaments: Tournament[] };
 let state: State = { tournaments: [] };
 let hydrated = false;
 const listeners = new Set<() => void>();
+const tombstones = new Set<string>();
 
 const STORAGE_KEY = "padel-tournaments-v1";
 
@@ -57,10 +58,12 @@ AsyncStorage.getItem(STORAGE_KEY)
     if (raw) {
       try {
         const persisted: State = JSON.parse(raw);
-        const fixed = persisted.tournaments.map((t) => ({
-          ...t,
-          updatedAt: (t as any).updatedAt ?? t.createdAt,
-        }));
+        const fixed = persisted.tournaments
+          .filter((t) => !tombstones.has(t.id))
+          .map((t) => ({
+            ...t,
+            updatedAt: (t as any).updatedAt ?? t.createdAt,
+          }));
         const seen = new Set(state.tournaments.map((t) => t.id));
         const merged = [
           ...state.tournaments,
@@ -102,6 +105,7 @@ export function applyRemoteUpsert(t: Tournament) {
 }
 
 export function applyRemoteDelete(id: string) {
+  tombstones.add(id);
   setState({ tournaments: state.tournaments.filter((t) => t.id !== id) });
 }
 
@@ -152,20 +156,57 @@ export function createTournament(input: {
 }
 
 export function deleteTournament(id: string) {
+  tombstones.add(id);
   setState({ tournaments: state.tournaments.filter((t) => t.id !== id) });
   changeListeners.forEach((l) => l({ kind: "delete", id }));
 }
 
 export function updateTournament(id: string, fn: (t: Tournament) => Tournament) {
   let next: Tournament | undefined;
+  let changed = false;
   setState({
     tournaments: state.tournaments.map((t) => {
       if (t.id !== id) return t;
-      next = { ...fn(t), updatedAt: Date.now() };
+      const candidate = fn(t);
+      // If pointsPerMatch was lowered, clamp existing scores to the new max so
+      // the score picker (which renders 0..pointsPerMatch) stays consistent
+      // with stored data.
+      let normalized = candidate;
+      if (candidate.pointsPerMatch !== t.pointsPerMatch) {
+        const max = candidate.pointsPerMatch;
+        normalized = {
+          ...candidate,
+          rounds: candidate.rounds.map((r) => ({
+            ...r,
+            matches: r.matches.map((m) => {
+              if (m.scoreA == null || m.scoreB == null) return m;
+              const sumOver = m.scoreA + m.scoreB - max;
+              if (sumOver <= 0 && m.scoreA <= max && m.scoreB <= max) return m;
+              const a = Math.min(max, m.scoreA);
+              const b = Math.min(max, m.scoreB);
+              // Preserve relative diff if possible; otherwise just clamp.
+              return { ...m, scoreA: a, scoreB: b };
+            }),
+          })),
+        };
+      }
+      // Cheap structural compare ignoring updatedAt, since updatedAt is what
+      // we'd be stamping anyway. JSON-stringify is good enough for the small
+      // tournament shape; if it matches, treat as a no-op.
+      const a = JSON.stringify({ ...t, updatedAt: 0 });
+      const b = JSON.stringify({ ...normalized, updatedAt: 0 });
+      if (a === b) {
+        next = t;
+        return t;
+      }
+      changed = true;
+      next = { ...normalized, updatedAt: Date.now() };
       return next;
     }),
   });
-  if (next) changeListeners.forEach((l) => l({ kind: "upsert", tournament: next! }));
+  if (changed && next) {
+    changeListeners.forEach((l) => l({ kind: "upsert", tournament: next! }));
+  }
 }
 
 export function playerStandings(t: Tournament) {
