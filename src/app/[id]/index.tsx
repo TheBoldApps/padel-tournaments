@@ -1,24 +1,43 @@
-import { Button, Card, Pill, colors } from "@/components/ui";
+import { AdaptiveGlass, Button } from "@/components/ui";
+import { MatchCard } from "@/components/match-card";
+import { RoundPillSelector } from "@/components/round-pill-selector";
 import { generateNextRound } from "@/lib/scheduler";
 import { Match, updateTournament, useTournaments } from "@/store/tournaments";
-import { useTheme } from "@react-navigation/native";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  PlatformColor,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 export default function TournamentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { tournaments } = useTournaments();
   const t = tournaments.find((x) => x.id === id);
-  const { colors: tc } = useTheme();
   const router = useRouter();
+  const [selectedIdx, setSelectedIdx] = useState(0);
+
+  // Default-select the latest round whenever the round count changes.
+  useEffect(() => {
+    if (t && t.rounds.length > 0) setSelectedIdx(t.rounds.length - 1);
+  }, [t?.rounds.length]);
 
   if (!t) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text style={{ color: tc.text }}>Tournament not found.</Text>
+      <View style={styles.center}>
+        <Text style={{ color: PlatformColor("label") as unknown as string }}>
+          Tournament not found.
+        </Text>
       </View>
     );
   }
+
+  const finished = t.finishedAt != null;
 
   const addRound = () => {
     const round = generateNextRound(t);
@@ -31,7 +50,11 @@ export default function TournamentScreen() {
     side: "A" | "B",
     value: string
   ) => {
-    const num = value === "" ? null : Math.max(0, Math.min(t.pointsPerMatch, Number(value) || 0));
+    if (finished) return;
+    const num =
+      value === ""
+        ? null
+        : Math.max(0, Math.min(t.pointsPerMatch, Number(value) || 0));
     updateTournament(t.id, (cur) => {
       const rounds = cur.rounds.map((r, ri) => {
         if (ri !== roundIdx) return r;
@@ -53,138 +76,185 @@ export default function TournamentScreen() {
     });
   };
 
-  const removeLastRound = () => {
-    updateTournament(t.id, (cur) => ({ ...cur, rounds: cur.rounds.slice(0, -1) }));
+  const finishOrLeaderboard = () => {
+    if (!finished) {
+      Alert.alert(
+        "Finish tournament?",
+        "You can no longer edit scores after finishing.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Finish",
+            style: "destructive",
+            onPress: () => {
+              updateTournament(t.id, (cur) => ({ ...cur, finishedAt: Date.now() }));
+              router.push(`/${t.id}/standings`);
+            },
+          },
+        ]
+      );
+    } else {
+      router.push(`/${t.id}/standings`);
+    }
   };
+
+  const round = t.rounds[selectedIdx];
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: tc.background }}
+      style={{ flex: 1 }}
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+      contentContainerStyle={{ paddingBottom: 120 }}
     >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={[styles.title, { color: tc.text }]}>{t.name}</Text>
-      </View>
-      <View style={{ flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-        <Pill
-          text={t.format === "americano" ? "Americano" : "Mexicano"}
-          color={t.format === "americano" ? colors.primary : colors.accent}
-        />
-        <Pill text={`${t.players.length} players`} color="#6366F1" />
-        <Pill text={`${t.pointsPerMatch} pts/match`} color="#10B981" />
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>{t.name}</Text>
+          <Text style={styles.subtitle}>
+            {t.format === "americano" ? "Classic Americano" : "Classic Mexicano"}
+          </Text>
+          <Text style={styles.subtitle}>
+            {new Date(t.createdAt).toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </Text>
+        </View>
+        <View style={{ alignItems: "flex-end", gap: 8 }}>
+          <View style={styles.statRow}>
+            <Text style={styles.statValue}>{t.pointsPerMatch}</Text>
+            <Image
+              source="sf:scope"
+              tintColor={PlatformColor("secondaryLabel") as unknown as string}
+              style={{ width: 18, height: 18 }}
+            />
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statValue}>{t.players.length}</Text>
+            <Image
+              source="sf:person.2.fill"
+              tintColor={PlatformColor("secondaryLabel") as unknown as string}
+              style={{ width: 18, height: 18 }}
+            />
+          </View>
+        </View>
       </View>
 
-      <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-        <Button title="+ New Round" onPress={addRound} style={{ flex: 1 }} />
-        <Button
-          title="Standings"
-          variant="secondary"
-          onPress={() => router.push(`/${t.id}/standings`)}
-          style={{ flex: 1 }}
-        />
-      </View>
+      <RoundPillSelector
+        rounds={t.rounds}
+        selectedIndex={selectedIdx}
+        onSelect={setSelectedIdx}
+        onAdd={addRound}
+        finished={finished}
+      />
 
-      {t.rounds.length === 0 && (
-        <Card style={{ marginTop: 16 }}>
-          <Text style={{ color: tc.text, fontSize: 16, fontWeight: "600" }}>
-            No rounds yet
-          </Text>
-          <Text style={{ color: tc.text, opacity: 0.7, marginTop: 4 }}>
-            Tap "New Round" to generate the first matchups.
-          </Text>
-        </Card>
+      {!round ? (
+        <Text style={styles.empty}>Tap More to add the first round.</Text>
+      ) : (
+        <View style={{ paddingHorizontal: 16 }}>
+          {round.matches.map((m, mi) => (
+            <MatchCard
+              key={mi}
+              match={m}
+              pointsPerMatch={t.pointsPerMatch}
+              onChangeA={(v) => setScore(selectedIdx, mi, "A", v)}
+              onChangeB={(v) => setScore(selectedIdx, mi, "B", v)}
+              disabled={finished}
+            />
+          ))}
+          {round.resting.length > 0 && (
+            <AdaptiveGlass
+              style={{
+                marginTop: 16,
+                padding: 14,
+                borderRadius: 14,
+                borderCurve: "continuous",
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <Image
+                  source="sf:chair.lounge"
+                  tintColor={PlatformColor("secondaryLabel") as unknown as string}
+                  style={{ width: 16, height: 16 }}
+                />
+                <Text style={styles.restingHeader}>Resting Players</Text>
+              </View>
+              <Text style={styles.restingNames}>
+                {round.resting.join(", ")}
+              </Text>
+            </AdaptiveGlass>
+          )}
+        </View>
       )}
 
-      {[...t.rounds].reverse().map((round, ri) => {
-        const realIdx = t.rounds.length - 1 - ri;
-        return (
-          <View key={round.number} style={{ marginTop: 18 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={[styles.section, { color: tc.text }]}>Round {round.number}</Text>
-              {realIdx === t.rounds.length - 1 && (
-                <Pressable onPress={removeLastRound} hitSlop={10}>
-                  <Text style={{ color: colors.danger, fontWeight: "600" }}>Remove</Text>
-                </Pressable>
-              )}
-            </View>
-            {round.matches.map((m, mi) => (
-              <Card key={mi}>
-                <Text style={{ color: tc.text, opacity: 0.6, fontSize: 12, fontWeight: "600" }}>
-                  COURT {m.court}
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: tc.text, fontWeight: "600" }}>
-                      {m.teamA[0]} & {m.teamA[1]}
-                    </Text>
-                  </View>
-                  <ScoreInput
-                    value={m.scoreA}
-                    max={t.pointsPerMatch}
-                    onChange={(v) => setScore(realIdx, mi, "A", v)}
-                  />
-                </View>
-                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: tc.text, fontWeight: "600" }}>
-                      {m.teamB[0]} & {m.teamB[1]}
-                    </Text>
-                  </View>
-                  <ScoreInput
-                    value={m.scoreB}
-                    max={t.pointsPerMatch}
-                    onChange={(v) => setScore(realIdx, mi, "B", v)}
-                  />
-                </View>
-              </Card>
-            ))}
-            {round.resting.length > 0 && (
-              <Text style={{ color: tc.text, opacity: 0.6, marginTop: 4 }}>
-                Resting: {round.resting.join(", ")}
-              </Text>
-            )}
-          </View>
-        );
-      })}
+      <View style={styles.bottomBar}>
+        <Button
+          title="+ More"
+          variant="ghost"
+          onPress={addRound}
+          style={{ flex: 1 }}
+        />
+        <Button
+          title={finished ? "Leaderboard" : "Finish"}
+          onPress={finishOrLeaderboard}
+          style={{ flex: 1.4 }}
+        />
+      </View>
     </ScrollView>
   );
 }
 
-function ScoreInput({
-  value,
-  max,
-  onChange,
-}: {
-  value: number | null;
-  max: number;
-  onChange: (s: string) => void;
-}) {
-  const { colors: tc } = useTheme();
-  return (
-    <TextInput
-      value={value == null ? "" : String(value)}
-      onChangeText={onChange}
-      keyboardType="number-pad"
-      placeholder="–"
-      placeholderTextColor={tc.text + "55"}
-      maxLength={String(max).length}
-      style={{
-        width: 60,
-        textAlign: "center",
-        borderWidth: 1,
-        borderColor: tc.border,
-        borderRadius: 8,
-        padding: 8,
-        color: tc.text,
-        fontSize: 18,
-        fontWeight: "700",
-      }}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
-  title: { fontSize: 24, fontWeight: "800" },
-  section: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  header: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: PlatformColor("label") as unknown as string,
+  },
+  subtitle: {
+    fontSize: 14,
+    marginTop: 2,
+    color: PlatformColor("secondaryLabel") as unknown as string,
+  },
+  statRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  statValue: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: PlatformColor("label") as unknown as string,
+    fontVariant: ["tabular-nums"],
+  },
+  empty: {
+    textAlign: "center",
+    marginTop: 32,
+    color: PlatformColor("secondaryLabel") as unknown as string,
+  },
+  restingHeader: {
+    fontWeight: "700",
+    fontSize: 15,
+    color: PlatformColor("label") as unknown as string,
+  },
+  restingNames: {
+    fontSize: 15,
+    color: PlatformColor("label") as unknown as string,
+  },
+  bottomBar: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    marginTop: 24,
+  },
 });
