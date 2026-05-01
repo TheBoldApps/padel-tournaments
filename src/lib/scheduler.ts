@@ -1,4 +1,5 @@
 import type { Match, Round, Tournament } from "@/store/tournaments";
+import { playerStandings } from "@/store/tournaments";
 
 function pairKey(a: string, b: string) {
   return [a, b].sort().join("|");
@@ -153,4 +154,20 @@ export function generateMexicanoRound(t: Tournament): Round {
 
 export function generateNextRound(t: Tournament): Round {
   return t.format === "mexicano" ? generateMexicanoRound(t) : generateAmericanoRound(t);
+}
+
+export function generateFinalRound(t: Tournament): Round {
+  const ranked = playerStandings(t).map((s) => s.player);
+  if (ranked.length < 4) {
+    throw new Error("Need at least 4 players to start a final round");
+  }
+  const [p1, p2, p3, p4] = ranked;
+  return {
+    number: t.rounds.length + 1,
+    final: true,
+    matches: [
+      { court: 1, teamA: [p1, p2], teamB: [p3, p4], scoreA: null, scoreB: null },
+    ],
+    resting: ranked.slice(4),
+  };
 }

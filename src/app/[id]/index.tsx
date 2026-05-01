@@ -1,14 +1,16 @@
 import { AdaptiveGlass, Button } from "@/components/ui";
 import { MatchCard } from "@/components/match-card";
+import { MenuSheet, type MenuItem } from "@/components/menu-sheet";
 import { RoundPillSelector } from "@/components/round-pill-selector";
-import { generateNextRound } from "@/lib/scheduler";
+import { generateFinalRound, generateNextRound } from "@/lib/scheduler";
 import { Match, updateTournament, useTournaments } from "@/store/tournaments";
 import { Image } from "expo-image";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
   PlatformColor,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -100,7 +102,69 @@ export default function TournamentScreen() {
 
   const round = t.rounds[selectedIdx];
 
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const startFinalRound = () => {
+    Alert.alert(
+      "Start final round?",
+      "Adds a championship match between the top 4 players.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Start",
+          onPress: () => {
+            const newRound = generateFinalRound(t);
+            updateTournament(t.id, (cur) => ({
+              ...cur,
+              rounds: [...cur.rounds, newRound],
+            }));
+          },
+        },
+      ]
+    );
+  };
+
+  const finishTournament = () => {
+    Alert.alert("Finish tournament?", "Scores will be locked.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Finish",
+        style: "destructive",
+        onPress: () =>
+          updateTournament(t.id, (cur) => ({ ...cur, finishedAt: Date.now() })),
+      },
+    ]);
+  };
+
+  const menuItems: MenuItem[] = [
+    { label: "Tournament Info", icon: "info.circle", onPress: () => router.push(`/${t.id}/info`) },
+    { label: "Edit Tournament", icon: "pencil", onPress: () => router.push(`/${t.id}/edit`) },
+    { label: "Start Final Round", icon: "trophy", onPress: startFinalRound },
+    {
+      label: finished ? "Reopen Tournament" : "Finish Tournament",
+      icon: finished ? "lock.open" : "checkmark.circle",
+      onPress: finished
+        ? () =>
+            updateTournament(t.id, (cur) => ({ ...cur, finishedAt: undefined }))
+        : finishTournament,
+    },
+  ];
+
   return (
+    <>
+    <Stack.Screen
+      options={{
+        headerRight: () => (
+          <Pressable onPress={() => setMenuOpen(true)} hitSlop={12}>
+            <Image
+              source="sf:ellipsis.circle"
+              tintColor={PlatformColor("systemTeal") as unknown as string}
+              style={{ width: 26, height: 26 }}
+            />
+          </Pressable>
+        ),
+      }}
+    />
     <ScrollView
       style={{ flex: 1 }}
       contentInsetAdjustmentBehavior="automatic"
@@ -208,6 +272,12 @@ export default function TournamentScreen() {
         />
       </View>
     </ScrollView>
+    <MenuSheet
+      visible={menuOpen}
+      onClose={() => setMenuOpen(false)}
+      items={menuItems}
+    />
+    </>
   );
 }
 
