@@ -7,7 +7,7 @@ import { generateFinalRound, generateNextRound } from "@/lib/scheduler";
 import { Match, updateTournament, useTournaments } from "@/store/tournaments";
 import { Image } from "expo-image";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   PlatformColor,
@@ -21,13 +21,40 @@ import {
 export default function TournamentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { tournaments } = useTournaments();
-  const t = tournaments.find((x) => x.id === id);
   const router = useRouter();
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [picker, setPicker] = useState<{
+    roundIdx: number;
+    matchIdx: number;
+    side: "A" | "B";
+  } | null>(null);
 
-  // Default-select the latest round whenever the round count changes.
+  const t = tournaments.find((x) => x.id === id);
+  const lastKnownRoundCount = useRef(t?.rounds.length ?? 0);
+
+  // Auto-jump to the new latest round only if a round was added AND the user
+  // was sitting on the previous-latest round. Preserves the user's manual
+  // selection when sync or "+ More" appends rounds.
   useEffect(() => {
-    if (t && t.rounds.length > 0) setSelectedIdx(t.rounds.length - 1);
+    if (!t) return;
+    if (
+      t.rounds.length > lastKnownRoundCount.current &&
+      selectedIdx === lastKnownRoundCount.current - 1
+    ) {
+      setSelectedIdx(t.rounds.length - 1);
+    }
+    lastKnownRoundCount.current = t.rounds.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t?.rounds.length]);
+
+  // Clamp selectedIdx if rounds were removed (don't dangle past end).
+  useEffect(() => {
+    if (!t) return;
+    if (selectedIdx > t.rounds.length - 1) {
+      setSelectedIdx(Math.max(0, t.rounds.length - 1));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t?.rounds.length]);
 
   if (!t) {
@@ -103,13 +130,6 @@ export default function TournamentScreen() {
   };
 
   const round = t.rounds[selectedIdx];
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [picker, setPicker] = useState<{
-    roundIdx: number;
-    matchIdx: number;
-    side: "A" | "B";
-  } | null>(null);
 
   const startFinalRound = () => {
     Alert.alert(
@@ -280,6 +300,7 @@ export default function TournamentScreen() {
           title="+ More"
           variant="ghost"
           onPress={addRound}
+          disabled={finished}
           style={{ flex: 1 }}
         />
         <Button

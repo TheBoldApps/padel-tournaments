@@ -13,6 +13,13 @@ import {
   View,
 } from "react-native";
 
+const esc = (s: string) =>
+  s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 function summary(t: Tournament): string[] {
   const courts = Math.max(1, Math.floor(t.players.length / 4));
   const totalMatches = courts * (t.rounds.length || 0);
@@ -39,16 +46,16 @@ function pdfHtml(t: Tournament): string {
         r.matches
           .map(
             (m) =>
-              `<p>Court ${m.court}: ${m.teamA.join(" & ")} <b>${m.scoreA ?? "–"}</b> vs <b>${m.scoreB ?? "–"}</b> ${m.teamB.join(" & ")}</p>`
+              `<p>Court ${m.court}: ${m.teamA.map(esc).join(" & ")} <b>${m.scoreA ?? "–"}</b> vs <b>${m.scoreB ?? "–"}</b> ${m.teamB.map(esc).join(" & ")}</p>`
           )
           .join("") +
-        (r.resting.length ? `<p><i>Resting: ${r.resting.join(", ")}</i></p>` : "")
+        (r.resting.length ? `<p><i>Resting: ${r.resting.map(esc).join(", ")}</i></p>` : "")
     )
     .join("");
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${t.name}</title>
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)}</title>
     <style>body{font-family:-apple-system,Helvetica,Arial,sans-serif;padding:24px;}
     h1{margin:0 0 4px}h3{margin-top:18px}p{margin:4px 0}</style></head>
-    <body><h1>${t.name}</h1><p>${t.format} · ${t.players.length} players · ${t.pointsPerMatch} pts/match</p>${rows}</body></html>`;
+    <body><h1>${esc(t.name)}</h1><p>${esc(t.format)} · ${t.players.length} players · ${t.pointsPerMatch} pts/match</p>${rows}</body></html>`;
 }
 
 export default function Info() {

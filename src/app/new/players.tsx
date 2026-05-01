@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { StepScreen, useWizard } from "./_chrome";
 
+const norm = (s: string) => s.trim().toLowerCase();
+
 export default function StepPlayers() {
   const router = useRouter();
   const { players, setPlayers } = useWizard();
@@ -23,11 +25,12 @@ export default function StepPlayers() {
   const useSymbol = process.env.EXPO_OS === "ios";
 
   const suggested = useMemo(() => {
-    const seen = new Set(players);
+    const seen = new Set(players.map(norm));
     const pool: string[] = [];
     for (const t of tournaments) {
       for (const p of t.players) {
-        if (!seen.has(p) && !pool.includes(p)) pool.push(p);
+        const k = norm(p);
+        if (!seen.has(k) && !pool.some((x) => norm(x) === k)) pool.push(p);
       }
       if (pool.length >= 24) break;
     }
@@ -37,7 +40,7 @@ export default function StepPlayers() {
   const add = () => {
     const n = input.trim();
     if (!n) return;
-    if (players.includes(n)) {
+    if (players.some((p) => norm(p) === norm(n))) {
       setInput("");
       return;
     }
@@ -46,7 +49,7 @@ export default function StepPlayers() {
   };
 
   const addOne = (n: string) => {
-    if (!players.includes(n)) setPlayers([...players, n]);
+    if (!players.some((p) => norm(p) === norm(n))) setPlayers([...players, n]);
   };
 
   const remove = (p: string) => setPlayers(players.filter((x) => x !== p));

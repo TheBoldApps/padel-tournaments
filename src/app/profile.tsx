@@ -7,7 +7,6 @@ import { router } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
-  Platform,
   PlatformColor,
   ScrollView,
   StyleSheet,
@@ -36,7 +35,7 @@ export default function Profile() {
   };
 
   const linkApple = async () => {
-    if (Platform.OS !== "ios") return;
+    if (process.env.EXPO_OS !== "ios") return;
     try {
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -90,9 +89,9 @@ export default function Profile() {
           icon="envelope"
           label="Email"
           value={user?.email ?? "—"}
-          last={isAnonymous && Platform.OS !== "ios"}
+          last={isAnonymous && process.env.EXPO_OS !== "ios"}
         />
-        {isAnonymous && Platform.OS === "ios" && (
+        {isAnonymous && process.env.EXPO_OS === "ios" && (
           <SettingsRow
             icon="apple.logo"
             label="Link Apple ID"

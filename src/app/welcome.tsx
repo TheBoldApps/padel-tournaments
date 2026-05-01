@@ -20,7 +20,16 @@ export default function Welcome() {
     setLoading(true);
     const { error } = await supabase.auth.signInAnonymously();
     setLoading(false);
-    if (error) Alert.alert("Couldn't continue", error.message);
+    if (error) {
+      Alert.alert(
+        "Couldn't continue as guest",
+        `${error.message}\n\nTry signing in with your email or Apple ID instead.`,
+        [
+          { text: "Sign in", onPress: () => router.push("/sign-in") },
+          { text: "OK", style: "cancel" },
+        ]
+      );
+    }
   };
 
   return (

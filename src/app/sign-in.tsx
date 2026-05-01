@@ -13,6 +13,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+// Platform is imported solely for the KeyboardAvoidingView `behavior` prop,
+// which is RN-typed against Platform.OS. All other OS checks use EXPO_OS.
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignIn() {
@@ -45,10 +47,16 @@ export default function SignIn() {
 
   const verifyCode = async () => {
     setLoading(true);
+    // Re-check at verify time: if the user signed out between sending the
+    // code and entering it, isUpgrade is stale.
+    const {
+      data: { user: cur },
+    } = await supabase.auth.getUser();
+    const reallyUpgrade = isUpgrade && Boolean(cur?.is_anonymous);
     const { error } = await supabase.auth.verifyOtp({
       email,
       token: code,
-      type: isUpgrade ? "email_change" : "email",
+      type: reallyUpgrade ? "email_change" : "email",
     });
     setLoading(false);
     if (error) {
@@ -95,7 +103,7 @@ export default function SignIn() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1, gap: 16 }}
       >
-        {Platform.OS === "ios" && (
+        {process.env.EXPO_OS === "ios" && (
           <AppleAuthentication.AppleAuthenticationButton
             buttonType={
               AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN

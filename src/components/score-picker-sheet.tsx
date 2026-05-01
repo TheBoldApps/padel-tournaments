@@ -2,7 +2,6 @@ import { colors } from "@/components/ui";
 import {
   Alert,
   Modal,
-  Platform,
   PlatformColor,
   Pressable,
   StyleSheet,
@@ -43,7 +42,7 @@ export function ScorePickerSheet({
   };
 
   const handleCustom = () => {
-    if (Platform.OS === "ios") {
+    if (process.env.EXPO_OS === "ios") {
       Alert.prompt(
         "Enter score",
         undefined,
@@ -69,7 +68,9 @@ export function ScorePickerSheet({
     }
   };
 
-  const cells = Array.from({ length: pointsPerMatch + 1 }, (_, i) => i);
+  const max = Math.min(30, pointsPerMatch);
+  const cells = Array.from({ length: max + 1 }, (_, i) => i);
+  const showCustomHint = pointsPerMatch > max;
   const resetDisabled = currentScore == null;
 
   return (
@@ -125,6 +126,11 @@ export function ScorePickerSheet({
           <Pressable onPress={handleCustom} style={styles.customBtn}>
             <Text style={styles.customText}>Enter Custom Score</Text>
           </Pressable>
+          {showCustomHint ? (
+            <Text style={styles.customHint}>
+              Tap "Enter Custom Score" for higher values.
+            </Text>
+          ) : null}
 
           <Pressable
             onPress={resetDisabled ? undefined : handleReset}
@@ -200,6 +206,13 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 15,
     fontWeight: "600",
+  },
+  customHint: {
+    fontSize: 12,
+    color: PlatformColor("secondaryLabel") as unknown as string,
+    textAlign: "center",
+    marginTop: -8,
+    marginBottom: 8,
   },
   resetBtn: {
     backgroundColor: PlatformColor(

@@ -300,7 +300,9 @@ export function SoftHeader({
         paddingTop: insets.top + 8,
         paddingHorizontal: 16,
         paddingBottom: 24,
-        backgroundColor: "#DBE5F4",
+        backgroundColor: PlatformColor(
+          "secondarySystemBackground"
+        ) as unknown as string,
       }}
     >
       <View
@@ -377,7 +379,9 @@ export function StepScreen({
         name={headerTitle}
         subtitle={subtitle}
         canBack={step > 1}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router.canGoBack()) router.back();
+        }}
         onClose={() =>
           confirmDiscardThen(() => router.dismiss(), isDirty())
         }

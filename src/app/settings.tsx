@@ -67,6 +67,33 @@ export default function Settings() {
         )}
       </SettingsSection>
 
+      {isAnonymous ? (
+        <SettingsSection title="Reset" footer="Clears your guest session.">
+          <SettingsRow
+            icon="arrow.counterclockwise"
+            label="Reset guest account"
+            destructive
+            last
+            onPress={() => {
+              Alert.alert(
+                "Reset guest account?",
+                "This signs you out. Tournaments saved on this device will sync only after you sign back in.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Reset",
+                    style: "destructive",
+                    onPress: async () => {
+                      await supabase.auth.signOut();
+                    },
+                  },
+                ]
+              );
+            }}
+          />
+        </SettingsSection>
+      ) : null}
+
       <SettingsSection title="About" footer={versionFooter}>
         <SettingsRow
           icon="doc.text"

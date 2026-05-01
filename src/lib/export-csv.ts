@@ -18,6 +18,16 @@ export function tournamentCsv(t: Tournament): string {
     ]);
   });
   return rows
-    .map((r) => r.map((cell) => (/[",\n]/.test(cell) ? `"${cell.replaceAll('"', '""')}"` : cell)).join(","))
+    .map((r) =>
+      r
+        .map((raw) => {
+          const cell = String(raw);
+          // Prefix leading =/+/-/@ with a single quote to neutralize CSV
+          // formula-injection in spreadsheet apps.
+          const safe = /^[=+\-@]/.test(cell) ? `'${cell}` : cell;
+          return /[",\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
+        })
+        .join(",")
+    )
     .join("\n");
 }
