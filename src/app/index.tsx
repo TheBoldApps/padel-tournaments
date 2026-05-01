@@ -1,4 +1,5 @@
 import { Card, GlassFab, Pill, colors } from "@/components/ui";
+import { refetch } from "@/lib/sync";
 import {
   deleteTournament,
   playerStandings,
@@ -7,11 +8,13 @@ import {
 import { useTheme } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { Stack, useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Alert,
   FlatList,
   PlatformColor,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -21,6 +24,12 @@ export default function Home() {
   const { tournaments } = useTournaments();
   const { colors: tc } = useTheme();
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch(tournaments);
+    setRefreshing(false);
+  };
 
   const confirmDelete = (id: string, name: string) => {
     if (process.env.EXPO_OS === "web") {
@@ -64,6 +73,7 @@ export default function Home() {
         data={tournaments}
         keyExtractor={(t) => t.id}
         contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 10 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             {useSymbol ? (
