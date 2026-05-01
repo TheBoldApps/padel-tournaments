@@ -1,5 +1,6 @@
 import { AdaptiveGlass, colors } from "@/components/ui";
-import type { Format } from "@/store/tournaments";
+import type { Format, SortBy } from "@/store/tournaments";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
   createContext,
@@ -30,10 +31,26 @@ type WizardState = {
   format: Format;
   points: string;
   players: string[];
+  sortBy: SortBy;
+  roundsCount: number | null;
+  courtsCount: number | null;
+  sitOutPoints: number;
+  roundTimerOn: boolean;
+  roundTimerMinutes: number;
+  winBonus: number;
+  drawBonus: number;
   setName: (v: string) => void;
   setFormat: (v: Format) => void;
   setPoints: (v: string) => void;
   setPlayers: (v: string[]) => void;
+  setSortBy: (v: SortBy) => void;
+  setRoundsCount: (v: number | null) => void;
+  setCourtsCount: (v: number | null) => void;
+  setSitOutPoints: (v: number) => void;
+  setRoundTimerOn: (v: boolean) => void;
+  setRoundTimerMinutes: (v: number) => void;
+  setWinBonus: (v: number) => void;
+  setDrawBonus: (v: number) => void;
   isStepValid: (step: WizardStep) => boolean;
   isDirty: () => boolean;
 };
@@ -45,6 +62,14 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const [format, setFormat] = useState<Format>("americano");
   const [points, setPoints] = useState("24");
   const [players, setPlayers] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortBy>("points");
+  const [roundsCount, setRoundsCount] = useState<number | null>(null);
+  const [courtsCount, setCourtsCount] = useState<number | null>(null);
+  const [sitOutPoints, setSitOutPoints] = useState<number>(0);
+  const [roundTimerOn, setRoundTimerOn] = useState<boolean>(false);
+  const [roundTimerMinutes, setRoundTimerMinutes] = useState<number>(10);
+  const [winBonus, setWinBonus] = useState<number>(0);
+  const [drawBonus, setDrawBonus] = useState<number>(0);
 
   const isStepValid = useCallback(
     (step: WizardStep) => {
@@ -75,14 +100,45 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       format,
       points,
       players,
+      sortBy,
+      roundsCount,
+      courtsCount,
+      sitOutPoints,
+      roundTimerOn,
+      roundTimerMinutes,
+      winBonus,
+      drawBonus,
       setName,
       setFormat,
       setPoints,
       setPlayers,
+      setSortBy,
+      setRoundsCount,
+      setCourtsCount,
+      setSitOutPoints,
+      setRoundTimerOn,
+      setRoundTimerMinutes,
+      setWinBonus,
+      setDrawBonus,
       isStepValid,
       isDirty,
     }),
-    [name, format, points, players, isStepValid, isDirty]
+    [
+      name,
+      format,
+      points,
+      players,
+      sortBy,
+      roundsCount,
+      courtsCount,
+      sitOutPoints,
+      roundTimerOn,
+      roundTimerMinutes,
+      winBonus,
+      drawBonus,
+      isStepValid,
+      isDirty,
+    ]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -94,34 +150,6 @@ export function useWizard(): WizardState {
   return v;
 }
 
-export function ProgressBar({ step }: { step: WizardStep }) {
-  return (
-    <View>
-      <Text style={chrome.stepCaption}>{`STEP ${step} OF 4`}</Text>
-      <View style={chrome.progressRow}>
-        {[1, 2, 3, 4].map((n) => {
-          const filled = n <= step;
-          return (
-            <View
-              key={n}
-              style={[
-                chrome.progressSeg,
-                {
-                  backgroundColor: filled
-                    ? colors.primary
-                    : (PlatformColor(
-                        "secondarySystemBackground"
-                      ) as unknown as string),
-                },
-              ]}
-            />
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
 export function WizardFooter({
   step,
   onNext,
@@ -131,10 +159,8 @@ export function WizardFooter({
   onNext: () => void;
   nextLabel?: string;
 }) {
-  const router = useRouter();
   const { isStepValid } = useWizard();
   const insets = useSafeAreaInsets();
-  const showBack = step > 1;
   const valid = isStepValid(step);
   return (
     <AdaptiveGlass
@@ -144,24 +170,11 @@ export function WizardFooter({
         paddingBottom: Math.max(insets.bottom, 12),
       }}
     >
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        {showBack ? (
-          <View style={{ flex: 1 }}>
-            <BigButton
-              title="Back"
-              variant="secondary"
-              onPress={() => router.back()}
-            />
-          </View>
-        ) : null}
-        <View style={{ flex: showBack ? 2 : 1 }}>
-          <BigButton
-            title={nextLabel ?? "Next"}
-            onPress={onNext}
-            disabled={!valid}
-          />
-        </View>
-      </View>
+      <BigButton
+        title={nextLabel ?? "Next"}
+        onPress={onNext}
+        disabled={!valid}
+      />
     </AdaptiveGlass>
   );
 }
@@ -209,6 +222,130 @@ function BigButton({
   );
 }
 
+function PillButton({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string;
+  label?: string;
+  onPress: () => void;
+}) {
+  const useSymbol = process.env.EXPO_OS === "ios";
+  const hasLabel = !!label;
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 4,
+          backgroundColor: PlatformColor(
+            "systemBackground"
+          ) as unknown as string,
+          borderRadius: 999,
+          paddingVertical: hasLabel ? 8 : 10,
+          paddingHorizontal: hasLabel ? 14 : 12,
+          minHeight: 40,
+          minWidth: hasLabel ? 0 : 44,
+          opacity: pressed ? 0.6 : 1,
+          shadowColor: "#000",
+          shadowOpacity: 0.04,
+          shadowRadius: 4,
+          shadowOffset: { width: 0, height: 1 },
+        },
+      ]}
+    >
+      {useSymbol ? (
+        <Image
+          source={`sf:${icon}`}
+          tintColor={PlatformColor("label") as unknown as string}
+          style={{ width: 14, height: 14 }}
+        />
+      ) : null}
+      {hasLabel ? (
+        <Text
+          style={{
+            color: PlatformColor("label") as unknown as string,
+            fontSize: 15,
+            fontWeight: "600",
+          }}
+        >
+          {label}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+export function SoftHeader({
+  name,
+  subtitle,
+  canBack,
+  onBack,
+  onClose,
+}: {
+  name: string;
+  subtitle?: string | null;
+  canBack: boolean;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={{
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 16,
+        paddingBottom: 24,
+        backgroundColor: "#DBE5F4",
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        {canBack ? (
+          <PillButton icon="chevron.left" label="Back" onPress={onBack} />
+        ) : (
+          <View style={{ width: 84 }} />
+        )}
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 17,
+              fontWeight: "700",
+              color: PlatformColor("label") as unknown as string,
+            }}
+          >
+            {name}
+          </Text>
+          {subtitle ? (
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: 13,
+                color: PlatformColor("secondaryLabel") as unknown as string,
+                marginTop: 2,
+              }}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        <PillButton icon="xmark" onPress={onClose} />
+      </View>
+    </View>
+  );
+}
+
 export function StepScreen({
   step,
   children,
@@ -222,25 +359,47 @@ export function StepScreen({
   nextLabel?: string;
   contentStyle?: ViewStyle;
 }) {
+  const router = useRouter();
+  const { name, format, isDirty } = useWizard();
+  const formatLabel = format === "americano" ? "Classic Americano" : "Classic Mexicano";
+  const subtitle = step >= 3 ? formatLabel : null;
+  const headerTitle = name.trim() || "New Tournament";
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1 }}
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: PlatformColor(
+          "systemGroupedBackground"
+        ) as unknown as string,
+      }}
     >
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[
-          { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32 },
-          contentStyle,
-        ]}
-        keyboardShouldPersistTaps="handled"
+      <SoftHeader
+        name={headerTitle}
+        subtitle={subtitle}
+        canBack={step > 1}
+        onBack={() => router.back()}
+        onClose={() =>
+          confirmDiscardThen(() => router.dismiss(), isDirty())
+        }
+      />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
       >
-        <ProgressBar step={step} />
-        <View style={{ height: 24 }} />
-        {children}
-      </ScrollView>
-      <WizardFooter step={step} onNext={onNext} nextLabel={nextLabel} />
-    </KeyboardAvoidingView>
+        <ScrollView
+          contentInsetAdjustmentBehavior="never"
+          contentContainerStyle={[
+            { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+            contentStyle,
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
+          {children}
+        </ScrollView>
+        <WizardFooter step={step} onNext={onNext} nextLabel={nextLabel} />
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -274,24 +433,6 @@ export function CancelButton() {
 }
 
 const chrome = StyleSheet.create({
-  stepCaption: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.2,
-    color: PlatformColor("secondaryLabel") as unknown as string,
-    textAlign: "right",
-    marginBottom: 8,
-  },
-  progressRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  progressSeg: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    borderCurve: "continuous",
-  },
   bigBtn: {
     height: 52,
     borderRadius: 16,
