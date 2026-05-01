@@ -1,30 +1,52 @@
-import { Card, GlassFab, Pill, colors } from "@/components/ui";
+import { AdaptiveGlass, GlassFab, colors } from "@/components/ui";
 import { refetch } from "@/lib/sync";
 import {
   deleteTournament,
-  playerStandings,
   useTournaments,
+  type Tournament,
 } from "@/store/tournaments";
-import { useTheme } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { Stack, useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
-  FlatList,
   PlatformColor,
   Pressable,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 
+const MONTH_FORMAT = new Intl.DateTimeFormat(undefined, {
+  month: "long",
+  year: "numeric",
+});
+
+const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "numeric",
+  year: "numeric",
+});
+
+function groupByMonth(items: Tournament[]) {
+  const map = new Map<string, Tournament[]>();
+  for (const t of items) {
+    const key = MONTH_FORMAT.format(new Date(t.createdAt));
+    const arr = map.get(key) ?? [];
+    arr.push(t);
+    map.set(key, arr);
+  }
+  return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
+}
+
 export default function Home() {
   const { tournaments } = useTournaments();
-  const { colors: tc } = useTheme();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const sections = useMemo(() => groupByMonth(tournaments), [tournaments]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await refetch(tournaments);
@@ -32,20 +54,20 @@ export default function Home() {
   };
 
   const confirmDelete = (id: string, name: string) => {
-    if (process.env.EXPO_OS === "web") {
-      if (confirm(`Delete "${name}"?`)) deleteTournament(id);
-    } else {
-      Alert.alert("Delete tournament", `Delete "${name}"?`, [
-        { text: "Cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteTournament(id) },
-      ]);
-    }
+    Alert.alert("Delete tournament", `Delete "${name}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => deleteTournament(id),
+      },
+    ]);
   };
 
   const useSymbol = process.env.EXPO_OS === "ios";
 
   return (
-    <View style={[styles.container, { backgroundColor: tc.background }]}>
+    <View style={{ flex: 1 }}>
       <Stack.Screen
         options={{
           title: "Tournaments",
@@ -54,9 +76,7 @@ export default function Home() {
               {useSymbol ? (
                 <Image
                   source="sf:gearshape"
-                  tintColor={
-                    PlatformColor("systemTeal") as unknown as string
-                  }
+                  tintColor={PlatformColor("systemTeal") as unknown as string}
                   style={{ width: 24, height: 24 }}
                 />
               ) : (
@@ -68,79 +88,60 @@ export default function Home() {
           ),
         }}
       />
-      <FlatList
+      <SectionList
         contentInsetAdjustmentBehavior="automatic"
-        data={tournaments}
+        sections={sections}
         keyExtractor={(t) => t.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 10 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 8 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        renderSectionHeader={({ section: { title } }) => (
+          <Text style={styles.sectionHeader}>{title}</Text>
+        )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            {useSymbol ? (
-              <Image
-                source="sf:trophy"
-                tintColor={PlatformColor("secondaryLabel") as unknown as string}
-                style={{ width: 48, height: 48, marginBottom: 12 }}
-              />
-            ) : (
-              <Text style={[styles.emptyTitle, { color: tc.text }]}>🎾</Text>
-            )}
-            <Text style={[styles.emptyTitle, { color: tc.text }]}>No tournaments yet</Text>
-            <Text style={{ color: tc.text, opacity: 0.7, textAlign: "center", marginTop: 6 }}>
-              Create your first Americano or Mexicano to get started.
+            <Image
+              source="sf:trophy"
+              tintColor={
+                PlatformColor("secondaryLabel") as unknown as string
+              }
+              style={{ width: 48, height: 48, marginBottom: 12 }}
+            />
+            <Text style={styles.emptyTitle}>No tournaments yet</Text>
+            <Text style={styles.emptySub}>
+              Tap "Create Tournament" to get started.
             </Text>
           </View>
         }
         renderItem={({ item }) => {
-          const standings = playerStandings(item);
-          const leader = standings[0];
-          const totalMatches = item.rounds.reduce((s, r) => s + r.matches.length, 0);
-          const played = item.rounds.reduce(
-            (s, r) => s + r.matches.filter((m) => m.scoreA != null).length,
+          const totalMatches = item.rounds.reduce(
+            (s, r) => s + r.matches.length,
             0
           );
           return (
-            <Pressable onPress={() => router.push(`/${item.id}`)}>
-              <Card glass>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={[styles.name, { color: tc.text }]}>{item.name}</Text>
-                  <Pressable onPress={() => confirmDelete(item.id, item.name)} hitSlop={10}>
-                    {useSymbol ? (
-                      <Image
-                        source="sf:trash"
-                        tintColor={colors.danger}
-                        style={{ width: 18, height: 18 }}
-                      />
-                    ) : (
-                      <Text style={{ color: colors.danger, fontWeight: "600" }}>Delete</Text>
-                    )}
-                  </Pressable>
+            <Pressable
+              onPress={() => router.push(`/${item.id}`)}
+              onLongPress={() => confirmDelete(item.id, item.name)}
+            >
+              <AdaptiveGlass style={styles.card}>
+                <View style={styles.topRow}>
+                  <Text style={styles.format}>
+                    {item.format === "americano"
+                      ? "Classic Americano"
+                      : "Classic Mexicano"}
+                  </Text>
+                  <Text style={styles.date}>
+                    {DATE_FORMAT.format(new Date(item.createdAt))}
+                  </Text>
                 </View>
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                  <Pill
-                    text={item.format === "americano" ? "Americano" : "Mexicano"}
-                    color={item.format === "americano" ? colors.primary : colors.accent}
-                  />
-                  <Pill text={`${item.players.length} players`} color="#6366F1" />
-                  <Pill text={`${played}/${totalMatches} matches`} color="#10B981" />
-                </View>
-                {leader && leader.played > 0 && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
-                    {useSymbol ? (
-                      <Image
-                        source="sf:trophy.fill"
-                        tintColor={colors.accent}
-                        style={{ width: 14, height: 14 }}
-                      />
-                    ) : (
-                      <Text>🏆</Text>
-                    )}
-                    <Text style={{ color: tc.text, opacity: 0.85 }}>
-                      Leading: {leader.player} ({leader.points} pts)
-                    </Text>
-                  </View>
-                )}
-              </Card>
+                <Text style={styles.name}>{item.name}</Text>
+                <View style={styles.divider} />
+                <Text style={styles.meta}>
+                  {item.players.length} Players · {item.rounds.length} Rounds
+                  {totalMatches ? ` · ${totalMatches} Matches` : ""}
+                </Text>
+              </AdaptiveGlass>
             </Pressable>
           );
         }}
@@ -148,7 +149,7 @@ export default function Home() {
       <View style={styles.fab}>
         <GlassFab
           icon="plus"
-          label="New Tournament"
+          label="Create Tournament"
           onPress={() => router.push("/new")}
         />
       </View>
@@ -157,9 +158,54 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  name: { fontSize: 18, fontWeight: "700" },
+  sectionHeader: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: PlatformColor("label") as unknown as string,
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  card: {
+    padding: 16,
+    borderRadius: 16,
+    borderCurve: "continuous",
+  },
+  topRow: { flexDirection: "row", justifyContent: "space-between" },
+  format: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: PlatformColor("secondaryLabel") as unknown as string,
+  },
+  date: {
+    fontSize: 14,
+    color: PlatformColor("secondaryLabel") as unknown as string,
+  },
+  name: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: PlatformColor("label") as unknown as string,
+    marginTop: 2,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: PlatformColor("separator") as unknown as string,
+    marginVertical: 10,
+  },
+  meta: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: PlatformColor("label") as unknown as string,
+  },
   empty: { alignItems: "center", paddingTop: 80, paddingHorizontal: 24 },
-  emptyTitle: { fontSize: 20, fontWeight: "700" },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: PlatformColor("label") as unknown as string,
+  },
+  emptySub: {
+    color: PlatformColor("secondaryLabel") as unknown as string,
+    textAlign: "center",
+    marginTop: 6,
+  },
   fab: { position: "absolute", bottom: 28, alignSelf: "center" },
 });
