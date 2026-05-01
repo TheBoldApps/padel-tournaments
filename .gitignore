@@ -42,3 +42,10 @@ app-example
 # generated native folders
 /ios
 /android
+
+# agent / planning artifacts
+.agents/
+.artifacts/
+.claude/
+.kiro/
+skills-lock.json

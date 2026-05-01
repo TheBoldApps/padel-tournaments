@@ -13,7 +13,6 @@ import {
 import {
   Alert,
   KeyboardAvoidingView,
-  Platform,
   PlatformColor,
   Pressable,
   ScrollView,
@@ -384,7 +383,7 @@ export function StepScreen({
         }
       />
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView
