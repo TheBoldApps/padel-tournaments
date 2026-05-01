@@ -22,12 +22,9 @@ export default function Layout() {
         <Stack.Screen
           name="new"
           options={{
-            title: "New Tournament",
-            presentation: "formSheet",
-            sheetGrabberVisible: true,
-            sheetAllowedDetents: [0.75, 1.0],
+            headerShown: false,
+            presentation: "fullScreenModal",
             contentStyle: { backgroundColor: "transparent" },
-            headerLargeTitle: false,
           }}
         />
         <Stack.Screen
