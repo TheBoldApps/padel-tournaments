@@ -74,7 +74,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary + "22",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 12,
   },
   title: {
     fontSize: 32,
@@ -85,8 +86,8 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     color: PlatformColor("secondaryLabel") as unknown as string,
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: 6,
+    marginBottom: 18,
   },
   inputCard: {
     borderRadius: 18,

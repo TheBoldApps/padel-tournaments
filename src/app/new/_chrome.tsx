@@ -297,9 +297,9 @@ export function SoftHeader({
   return (
     <View
       style={{
-        paddingTop: insets.top + 8,
+        paddingTop: insets.top + 4,
         paddingHorizontal: 16,
-        paddingBottom: 24,
+        paddingBottom: 10,
         backgroundColor: PlatformColor(
           "secondarySystemBackground"
         ) as unknown as string,
@@ -364,7 +364,10 @@ export function StepScreen({
   const { name, format, isDirty } = useWizard();
   const formatLabel = format === "americano" ? "Classic Americano" : "Classic Mexicano";
   const subtitle = step >= 3 ? formatLabel : null;
-  const headerTitle = name.trim() || "New Tournament";
+  // Step 1 echoes the input the user is typing — that's a duplicate label, so
+  // show the generic title instead. From step 2 onward the name is locked in
+  // and showing it as breadcrumb is useful.
+  const headerTitle = step === 1 ? "New Tournament" : (name.trim() || "New Tournament");
 
   return (
     <View
@@ -393,7 +396,7 @@ export function StepScreen({
         <ScrollView
           contentInsetAdjustmentBehavior="never"
           contentContainerStyle={[
-            { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+            { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32 },
             contentStyle,
           ]}
           keyboardShouldPersistTaps="handled"
