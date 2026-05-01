@@ -1,5 +1,6 @@
 import { AdaptiveGlass, colors, formatColors } from "@/components/ui";
-import { createTournament } from "@/store/tournaments";
+import { generateNextRound } from "@/lib/scheduler";
+import { createTournament, updateTournament } from "@/store/tournaments";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
@@ -41,6 +42,10 @@ export default function StepReview() {
       pointsPerMatch: ptsNum,
       players,
     });
+    // Pre-generate the first round so the user lands on a playable schedule
+    // instead of an empty "Tap More to add the first round" screen.
+    const firstRound = generateNextRound(t);
+    updateTournament(t.id, (cur) => ({ ...cur, rounds: [firstRound] }));
     router.dismissTo(`/${t.id}`);
   };
 
