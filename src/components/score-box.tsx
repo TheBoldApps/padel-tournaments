@@ -1,22 +1,22 @@
 import {
   PlatformColor,
+  Pressable,
   StyleSheet,
-  TextInput,
-  View,
+  Text,
 } from "react-native";
 
 type State = "neutral" | "winner" | "loser";
 
 export function ScoreBox({
   value,
-  onChange,
   state,
-  max,
+  onPress,
+  disabled,
 }: {
   value: number | null;
-  onChange: (v: string) => void;
   state: State;
-  max: number;
+  onPress: () => void;
+  disabled?: boolean;
 }) {
   const bg =
     state === "winner"
@@ -29,23 +29,24 @@ export function ScoreBox({
       ? (PlatformColor("label") as unknown as string)
       : "#FFFFFF";
 
+  const display = value == null ? "––" : String(value).padStart(2, "0");
+
   return (
-    <View
-      style={[
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
         styles.box,
-        { backgroundColor: bg, borderCurve: "continuous" },
+        {
+          backgroundColor: bg,
+          borderCurve: "continuous",
+          transform: pressed ? [{ scale: 0.95 }] : [{ scale: 1 }],
+          opacity: pressed ? 0.85 : 1,
+        },
       ]}
     >
-      <TextInput
-        value={value == null ? "" : String(value).padStart(2, "0")}
-        onChangeText={onChange}
-        keyboardType="number-pad"
-        placeholder="––"
-        placeholderTextColor={fg + "88"}
-        maxLength={String(max).length}
-        style={[styles.input, { color: fg }]}
-      />
-    </View>
+      <Text style={[styles.text, { color: fg }]}>{display}</Text>
+    </Pressable>
   );
 }
 
@@ -68,12 +69,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  input: {
+  text: {
     fontSize: 24,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
     textAlign: "center",
-    width: "100%",
-    padding: 0,
   },
 });

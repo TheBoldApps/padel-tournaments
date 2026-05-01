@@ -2,6 +2,7 @@ import { AdaptiveGlass, Button, formatColors } from "@/components/ui";
 import { MatchCard } from "@/components/match-card";
 import { MenuSheet, type MenuItem } from "@/components/menu-sheet";
 import { RoundPillSelector } from "@/components/round-pill-selector";
+import { ScorePickerSheet } from "@/components/score-picker-sheet";
 import { generateFinalRound, generateNextRound } from "@/lib/scheduler";
 import { Match, updateTournament, useTournaments } from "@/store/tournaments";
 import { Image } from "expo-image";
@@ -104,6 +105,11 @@ export default function TournamentScreen() {
   const round = t.rounds[selectedIdx];
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [picker, setPicker] = useState<{
+    roundIdx: number;
+    matchIdx: number;
+    side: "A" | "B";
+  } | null>(null);
 
   const startFinalRound = () => {
     Alert.alert(
@@ -228,8 +234,12 @@ export default function TournamentScreen() {
               key={mi}
               match={m}
               pointsPerMatch={t.pointsPerMatch}
-              onChangeA={(v) => setScore(selectedIdx, mi, "A", v)}
-              onChangeB={(v) => setScore(selectedIdx, mi, "B", v)}
+              onPickA={() =>
+                setPicker({ roundIdx: selectedIdx, matchIdx: mi, side: "A" })
+              }
+              onPickB={() =>
+                setPicker({ roundIdx: selectedIdx, matchIdx: mi, side: "B" })
+              }
               disabled={finished}
             />
           ))}
@@ -284,6 +294,40 @@ export default function TournamentScreen() {
       onClose={() => setMenuOpen(false)}
       items={menuItems}
     />
+    {picker && (() => {
+      const r = t.rounds[picker.roundIdx];
+      const m = r?.matches[picker.matchIdx];
+      if (!m) return null;
+      const team = picker.side === "A" ? m.teamA : m.teamB;
+      const cur = picker.side === "A" ? m.scoreA : m.scoreB;
+      return (
+        <ScorePickerSheet
+          visible
+          onClose={() => setPicker(null)}
+          title={`Score for ${team.join(" & ")}`}
+          pointsPerMatch={t.pointsPerMatch}
+          currentScore={cur}
+          onPick={(n) => {
+            setScore(picker.roundIdx, picker.matchIdx, picker.side, String(n));
+            setPicker(null);
+          }}
+          onReset={() => {
+            updateTournament(t.id, (cur2) => {
+              const rounds = cur2.rounds.map((rr, ri) => {
+                if (ri !== picker.roundIdx) return rr;
+                const matches = rr.matches.map((mm, mi) => {
+                  if (mi !== picker.matchIdx) return mm;
+                  return { ...mm, scoreA: null, scoreB: null };
+                });
+                return { ...rr, matches };
+              });
+              return { ...cur2, rounds };
+            });
+            setPicker(null);
+          }}
+        />
+      );
+    })()}
     </>
   );
 }

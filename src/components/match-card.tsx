@@ -18,15 +18,15 @@ export type MatchVM = {
 
 export function MatchCard({
   match,
-  pointsPerMatch,
-  onChangeA,
-  onChangeB,
+  pointsPerMatch: _pointsPerMatch,
+  onPickA,
+  onPickB,
   disabled,
 }: {
   match: MatchVM;
   pointsPerMatch: number;
-  onChangeA: (v: string) => void;
-  onChangeB: (v: string) => void;
+  onPickA: () => void;
+  onPickB: () => void;
   disabled?: boolean;
 }) {
   return (
@@ -34,15 +34,15 @@ export function MatchCard({
       <View style={styles.scoreRow}>
         <ScoreBox
           value={match.scoreA}
-          onChange={disabled ? () => {} : onChangeA}
+          onPress={disabled ? () => {} : onPickA}
           state={scoreState(match.scoreA, match.scoreB, "A")}
-          max={pointsPerMatch}
+          disabled={disabled}
         />
         <ScoreBox
           value={match.scoreB}
-          onChange={disabled ? () => {} : onChangeB}
+          onPress={disabled ? () => {} : onPickB}
           state={scoreState(match.scoreA, match.scoreB, "B")}
-          max={pointsPerMatch}
+          disabled={disabled}
         />
       </View>
       <AdaptiveGlass
