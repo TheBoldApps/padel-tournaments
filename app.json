@@ -36,7 +36,7 @@
     "slug": "tournament-pedal-organizer",
     "owner": "theboldapps",
     "ios": {
-      "bundleIdentifier": "com.anonymous.tournament-pedal-organizer",
+      "bundleIdentifier": "com.padel.americano.mexicano.tournament",
       "usesAppleSignIn": true
     },
     "extra": {
