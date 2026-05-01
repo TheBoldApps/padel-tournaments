@@ -102,13 +102,22 @@ export function generateMexicanoRound(t: Tournament): Round {
 
   const courts = Math.floor(t.players.length / 4);
   const needed = courts * 4;
-  const ranked = [...t.players].sort((a, b) => {
-    const r = restCounts[b] - restCounts[a];
-    if (r !== 0) return r;
-    return points[b] - points[a];
+
+  // Pick who rests first: lowest by points, with rest-count as a stability
+  // tiebreak (whoever has rested least sits out next).
+  const restOrder = [...t.players].sort((a, b) => {
+    const p = points[a] - points[b];
+    if (p !== 0) return p;
+    return restCounts[a] - restCounts[b];
   });
-  const playing = ranked.slice(0, needed).sort((a, b) => points[b] - points[a]);
-  const resting = ranked.slice(needed);
+  const restingSet = new Set(restOrder.slice(0, t.players.length - needed));
+  const resting = [...restingSet];
+
+  // Court assignment is purely points-driven so a previously-rested player
+  // can't leapfrog a higher scorer onto a higher court.
+  const playing = t.players
+    .filter((p) => !restingSet.has(p))
+    .sort((a, b) => points[b] - points[a]);
 
   const matches: Match[] = [];
   for (let i = 0; i < playing.length; i += 4) {
