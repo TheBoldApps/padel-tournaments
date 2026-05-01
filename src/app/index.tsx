@@ -1,6 +1,5 @@
 import { MenuSheet, type MenuItem } from "@/components/menu-sheet";
-import { ShimmerFab } from "@/components/shimmer-fab";
-import { AdaptiveGlass, colors, useFormatColors } from "@/components/ui";
+import { AdaptiveGlass, GlassFab, colors, useFormatColors } from "@/components/ui";
 import { refetch } from "@/lib/sync";
 import {
   deleteTournament,
@@ -240,7 +239,7 @@ export default function Home() {
         )}
       />
       <View style={styles.fab}>
-        <ShimmerFab
+        <GlassFab
           icon="plus"
           label="Create Tournament"
           onPress={() => router.push("/new")}

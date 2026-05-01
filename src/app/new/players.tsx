@@ -175,7 +175,7 @@ export default function StepPlayers() {
           </Text>
           <AdaptiveGlass style={styles.listCard}>
             {suggested.map((p, i) => (
-              <View key={p}>
+              <View key={`${i}:${p}`}>
                 <Pressable
                   onPress={() => addOne(p)}
                   style={({ pressed }) => [

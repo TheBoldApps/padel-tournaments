@@ -99,9 +99,11 @@ export default function SignIn() {
           .join(" ");
         await supabase.auth.updateUser({ data: { display_name: display } });
       }
+      if (!mounted.current) return;
       router.dismissAll();
     } catch (e: any) {
       if (e.code === "ERR_REQUEST_CANCELED") return;
+      if (!mounted.current) return;
       Alert.alert("Apple Sign-In failed", String(e?.message ?? e));
     }
   };
