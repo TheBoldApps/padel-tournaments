@@ -32,8 +32,7 @@
         }
       ],
       "expo-secure-store",
-      "expo-apple-authentication",
-      "expo-sharing"
+      "expo-apple-authentication"
     ],
     "name": "Padel",
     "slug": "tournament-pedal-organizer",
