@@ -70,7 +70,12 @@ function RootStack() {
         />
         <Stack.Screen
           name="[id]/standings"
-          options={{ title: "Standings", headerLargeTitle: false }}
+          options={{
+            title: "Leaderboard",
+            presentation: "formSheet",
+            contentStyle: { backgroundColor: "transparent" },
+            headerLargeTitle: false,
+          }}
         />
         <Stack.Screen
           name="settings"
