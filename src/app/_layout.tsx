@@ -78,6 +78,10 @@ function RootStack() {
           }}
         />
         <Stack.Screen
+          name="[id]/round-breakdown"
+          options={{ title: "Round Breakdown", headerLargeTitle: false }}
+        />
+        <Stack.Screen
           name="settings"
           options={{
             title: "Settings",
