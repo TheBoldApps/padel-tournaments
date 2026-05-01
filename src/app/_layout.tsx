@@ -86,6 +86,15 @@ function RootStack() {
           options={{ title: "Export CSV", headerLargeTitle: false }}
         />
         <Stack.Screen
+          name="[id]/info"
+          options={{
+            title: "Tournament Information",
+            presentation: "formSheet",
+            contentStyle: { backgroundColor: "transparent" },
+            headerLargeTitle: false,
+          }}
+        />
+        <Stack.Screen
           name="settings"
           options={{
             title: "Settings",
