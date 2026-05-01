@@ -3,6 +3,8 @@ import { useSyncExternalStore } from "react";
 
 export type Format = "americano" | "mexicano";
 
+export type SortBy = "points" | "wins" | "winRatio";
+
 export type Match = {
   court: number;
   teamA: string[];
@@ -28,6 +30,18 @@ export type Tournament = {
   createdAt: number;
   updatedAt: number;
   finishedAt?: number;
+  /** Leaderboard sort key. Default: "points". */
+  sortBy?: SortBy;
+  /** Override auto courts (else floor(players/4)). Defaults to undefined. */
+  courtsCount?: number;
+  /** Per-round compensation for resting players. Default 0. */
+  sitOutPoints?: number;
+  /** Round timer duration in seconds (0 = off). */
+  roundTimerSeconds?: number;
+  /** Extra points awarded to each winner of a match. Default 0. */
+  winBonus?: number;
+  /** Extra points awarded to both teams in a tied match. Default 0. */
+  drawBonus?: number;
 };
 
 type State = { tournaments: Tournament[] };
@@ -155,22 +169,34 @@ export function updateTournament(id: string, fn: (t: Tournament) => Tournament) 
 }
 
 export function playerStandings(t: Tournament) {
-  const stats: Record<
-    string,
-    {
-      player: string;
-      points: number;
-      played: number;
-      won: number;
-      tied: number;
-      lost: number;
-      diff: number;
-    }
-  > = {};
+  const winBonus = t.winBonus ?? 0;
+  const drawBonus = t.drawBonus ?? 0;
+  const sitOut = t.sitOutPoints ?? 0;
+  const sortBy: SortBy = t.sortBy ?? "points";
+
+  type Stat = {
+    player: string;
+    points: number;
+    played: number;
+    won: number;
+    tied: number;
+    lost: number;
+    diff: number;
+  };
+
+  const stats: Record<string, Stat> = {};
   for (const p of t.players) {
     stats[p] = { player: p, points: 0, played: 0, won: 0, tied: 0, lost: 0, diff: 0 };
   }
+
   for (const r of t.rounds) {
+    // Sit-out compensation: award `sitOut` points to every resting player
+    // for every round (counts even if no matches were scored).
+    if (sitOut > 0) {
+      for (const p of r.resting) {
+        if (stats[p]) stats[p].points += sitOut;
+      }
+    }
     for (const m of r.matches) {
       if (m.scoreA == null || m.scoreB == null) continue;
       const aWin = m.scoreA > m.scoreB;
@@ -178,7 +204,7 @@ export function playerStandings(t: Tournament) {
       const tie = m.scoreA === m.scoreB;
       for (const p of m.teamA) {
         if (!stats[p]) continue;
-        stats[p].points += m.scoreA;
+        stats[p].points += m.scoreA + (aWin ? winBonus : tie ? drawBonus : 0);
         stats[p].played += 1;
         stats[p].diff += m.scoreA - m.scoreB;
         if (aWin) stats[p].won += 1;
@@ -187,7 +213,7 @@ export function playerStandings(t: Tournament) {
       }
       for (const p of m.teamB) {
         if (!stats[p]) continue;
-        stats[p].points += m.scoreB;
+        stats[p].points += m.scoreB + (bWin ? winBonus : tie ? drawBonus : 0);
         stats[p].played += 1;
         stats[p].diff += m.scoreB - m.scoreA;
         if (bWin) stats[p].won += 1;
@@ -196,7 +222,15 @@ export function playerStandings(t: Tournament) {
       }
     }
   }
-  return Object.values(stats).sort(
-    (a, b) => b.points - a.points || b.diff - a.diff || b.won - a.won
-  );
+
+  const arr = Object.values(stats);
+  if (sortBy === "wins") {
+    arr.sort((a, b) => b.won - a.won || b.points - a.points || b.diff - a.diff);
+  } else if (sortBy === "winRatio") {
+    const ratio = (s: Stat) => (s.played === 0 ? 0 : s.won / s.played);
+    arr.sort((a, b) => ratio(b) - ratio(a) || b.won - a.won || b.points - a.points);
+  } else {
+    arr.sort((a, b) => b.points - a.points || b.diff - a.diff || b.won - a.won);
+  }
+  return arr;
 }

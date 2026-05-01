@@ -21,7 +21,13 @@ export function generateAmericanoRound(t: Tournament): Round {
   for (const p of t.players) restCounts[p] = 0;
   for (const r of t.rounds) for (const p of r.resting) restCounts[p] = (restCounts[p] ?? 0) + 1;
 
-  const courts = Math.floor(t.players.length / 4);
+  const courts = Math.max(
+    1,
+    Math.min(
+      Math.floor(t.players.length / 4),
+      t.courtsCount ?? Math.floor(t.players.length / 4)
+    )
+  );
   const needed = courts * 4;
   const sortedByRest = [...t.players].sort(
     (a, b) => restCounts[b] - restCounts[a] || Math.random() - 0.5
@@ -101,7 +107,13 @@ export function generateMexicanoRound(t: Tournament): Round {
   for (const p of t.players) restCounts[p] = 0;
   for (const r of t.rounds) for (const p of r.resting) restCounts[p] = (restCounts[p] ?? 0) + 1;
 
-  const courts = Math.floor(t.players.length / 4);
+  const courts = Math.max(
+    1,
+    Math.min(
+      Math.floor(t.players.length / 4),
+      t.courtsCount ?? Math.floor(t.players.length / 4)
+    )
+  );
   const needed = courts * 4;
 
   // Pick who rests first: lowest by points, with rest-count as a stability
