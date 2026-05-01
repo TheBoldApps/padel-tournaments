@@ -95,6 +95,15 @@ function RootStack() {
           }}
         />
         <Stack.Screen
+          name="[id]/edit"
+          options={{
+            title: "Edit Tournament",
+            presentation: "formSheet",
+            contentStyle: { backgroundColor: "transparent" },
+            headerLargeTitle: false,
+          }}
+        />
+        <Stack.Screen
           name="settings"
           options={{
             title: "Settings",
