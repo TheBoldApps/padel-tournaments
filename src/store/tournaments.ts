@@ -25,6 +25,7 @@ export type Tournament = {
   players: string[];
   rounds: Round[];
   createdAt: number;
+  updatedAt: number;
 };
 
 type State = { tournaments: Tournament[] };
@@ -40,10 +41,14 @@ AsyncStorage.getItem(STORAGE_KEY)
     if (raw) {
       try {
         const persisted: State = JSON.parse(raw);
+        const fixed = persisted.tournaments.map((t) => ({
+          ...t,
+          updatedAt: (t as any).updatedAt ?? t.createdAt,
+        }));
         const seen = new Set(state.tournaments.map((t) => t.id));
         const merged = [
           ...state.tournaments,
-          ...persisted.tournaments.filter((t) => !seen.has(t.id)),
+          ...fixed.filter((t) => !seen.has(t.id)),
         ];
         state = { tournaments: merged };
       } catch {}
@@ -55,6 +60,34 @@ AsyncStorage.getItem(STORAGE_KEY)
   .catch(() => {
     hydrated = true;
   });
+
+export type Change =
+  | { kind: "upsert"; tournament: Tournament }
+  | { kind: "delete"; id: string };
+
+const changeListeners = new Set<(c: Change) => void>();
+
+export function onTournamentChange(fn: (c: Change) => void) {
+  changeListeners.add(fn);
+  return () => changeListeners.delete(fn);
+}
+
+export function replaceAllTournaments(next: Tournament[]) {
+  setState({ tournaments: next });
+}
+
+export function applyRemoteUpsert(t: Tournament) {
+  const exists = state.tournaments.some((x) => x.id === t.id);
+  setState({
+    tournaments: exists
+      ? state.tournaments.map((x) => (x.id === t.id ? t : x))
+      : [t, ...state.tournaments],
+  });
+}
+
+export function applyRemoteDelete(id: string) {
+  setState({ tournaments: state.tournaments.filter((t) => t.id !== id) });
+}
 
 function setState(next: State) {
   state = next;
@@ -86,6 +119,7 @@ export function createTournament(input: {
   pointsPerMatch: number;
   players: string[];
 }): Tournament {
+  const now = Date.now();
   const t: Tournament = {
     id: Math.random().toString(36).slice(2, 10),
     name: input.name,
@@ -93,20 +127,29 @@ export function createTournament(input: {
     pointsPerMatch: input.pointsPerMatch,
     players: input.players,
     rounds: [],
-    createdAt: Date.now(),
+    createdAt: now,
+    updatedAt: now,
   };
   setState({ tournaments: [t, ...state.tournaments] });
+  changeListeners.forEach((l) => l({ kind: "upsert", tournament: t }));
   return t;
 }
 
 export function deleteTournament(id: string) {
   setState({ tournaments: state.tournaments.filter((t) => t.id !== id) });
+  changeListeners.forEach((l) => l({ kind: "delete", id }));
 }
 
 export function updateTournament(id: string, fn: (t: Tournament) => Tournament) {
+  let next: Tournament | undefined;
   setState({
-    tournaments: state.tournaments.map((t) => (t.id === id ? fn(t) : t)),
+    tournaments: state.tournaments.map((t) => {
+      if (t.id !== id) return t;
+      next = { ...fn(t), updatedAt: Date.now() };
+      return next;
+    }),
   });
+  if (next) changeListeners.forEach((l) => l({ kind: "upsert", tournament: next! }));
 }
 
 export function playerStandings(t: Tournament) {
